@@ -59,6 +59,9 @@ export const getStoredContactMessages = (): ContactMessage[] => {
 export const saveStoredContactMessages = (messages: ContactMessage[]): void => {
   try {
     localStorage.setItem('espoir_contact_history', JSON.stringify(messages));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'messages' } }));
+    }
   } catch (e) {
     console.error('Error saving contact messages:', e);
   }
