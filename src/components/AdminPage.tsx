@@ -148,14 +148,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
   const [eventDescription, setEventDescription] = useState('');
   const [eventIsOnline, setEventIsOnline] = useState(true);
 
-  // Prayer modal state (Add / Edit)
-  const [editingPrayer, setEditingPrayer] = useState<PrayerItem | null>(null);
-  const [isPrayerModalOpen, setIsPrayerModalOpen] = useState(false);
-  const [prayerAuthor, setPrayerAuthor] = useState('');
-  const [prayerLocation, setPrayerLocation] = useState('');
-  const [prayerCategory, setPrayerCategory] = useState<PrayerItem['category']>('Santé');
-  const [prayerRequest, setPrayerRequest] = useState('');
-  const [prayerIsUrgent, setPrayerIsUrgent] = useState(false);
+
 
   // Blog modal state (Add / Edit)
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
@@ -593,85 +586,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     }
   };
 
-  // Prayer modal handlers
-  const openNewPrayerModal = () => {
-    setEditingPrayer(null);
-    setPrayerAuthor('');
-    setPrayerLocation('');
-    setPrayerCategory('Santé');
-    setPrayerRequest('');
-    setPrayerIsUrgent(false);
-    setIsPrayerModalOpen(true);
-  };
 
-  const openEditPrayerModal = (item: PrayerItem) => {
-    setEditingPrayer(item);
-    setPrayerAuthor(item.author);
-    setPrayerLocation(item.location || '');
-    setPrayerCategory(item.category);
-    setPrayerRequest(item.request);
-    setPrayerIsUrgent(Boolean(item.isUrgent));
-    setIsPrayerModalOpen(true);
-  };
-
-  const handleSavePrayerSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prayerRequest.trim()) return;
-
-    let updatedPrayers: PrayerItem[];
-    const prayerTargetId = editingPrayer ? editingPrayer.id : `p-${Date.now()}`;
-    if (editingPrayer) {
-      updatedPrayers = prayers.map((p) =>
-        p.id === editingPrayer.id
-          ? {
-              ...p,
-              author: prayerAuthor.trim() || 'Anonyme',
-              location: prayerLocation.trim() || undefined,
-              category: prayerCategory,
-              request: prayerRequest.trim(),
-              isUrgent: prayerIsUrgent,
-            }
-          : p
-      );
-    } else {
-      const newP: PrayerItem = {
-        id: prayerTargetId,
-        author: prayerAuthor.trim() || 'Visiteur Espoir',
-        location: prayerLocation.trim() || undefined,
-        category: prayerCategory,
-        request: prayerRequest.trim(),
-        date: "Aujourd'hui, " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        prayersCount: 1,
-        isUrgent: prayerIsUrgent,
-      };
-      updatedPrayers = [newP, ...prayers];
-    }
-    setPrayers(updatedPrayers);
-    saveStoredPrayers(updatedPrayers);
-
-    // Sync to Server API for cross-device visibility
-    await saveServerPrayers(updatedPrayers);
-
-    // Try Supabase sync
-    const client = getSupabaseClient();
-    if (client) {
-      try {
-        await client.from('prayers').upsert({
-          id: prayerTargetId,
-          author: prayerAuthor.trim() || 'Visiteur Espoir',
-          location: prayerLocation.trim() || null,
-          category: prayerCategory,
-          request: prayerRequest.trim(),
-          date: editingPrayer ? editingPrayer.date : "Aujourd'hui",
-          prayers_count: editingPrayer ? editingPrayer.prayersCount : 1,
-          is_urgent: prayerIsUrgent,
-          is_approved: true,
-        });
-      } catch (err) {}
-    }
-
-    setIsPrayerModalOpen(false);
-  };
 
   const handleDeletePrayer = async (id: string) => {
     if (!window.confirm('Supprimer cette intention de prière ?')) return;
@@ -1426,13 +1341,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={openNewPrayerModal}
-                  className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow flex items-center gap-1.5 active:scale-95"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Ajouter une Prière</span>
-                </button>
-                <button
                   onClick={() => {
                     if (window.confirm('Réinitialiser les prières par défaut ?')) {
                       setPrayers(DEFAULT_PRAYERS);
@@ -1479,13 +1387,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                         {item.category}
                       </span>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => openEditPrayerModal(item)}
-                          className="p-1 text-slate-400 hover:text-amber-400"
-                          title="Modifier"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
                         <button
                           onClick={() => handleDeletePrayer(item.id)}
                           className="p-1 text-slate-400 hover:text-rose-400"
@@ -2076,98 +1977,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: ADD / EDIT PRAYER */}
-      {/* ------------------------------------------------------------- */}
-      {isPrayerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setIsPrayerModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
 
-            <h3 className="text-xl font-serif font-bold text-white mb-4">
-              {editingPrayer ? 'Modifier la prière' : 'Ajouter une intention de prière'}
-            </h3>
-
-            <form onSubmit={handleSavePrayerSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Auteur</label>
-                  <input
-                    type="text"
-                    required
-                    value={prayerAuthor}
-                    onChange={(e) => setPrayerAuthor(e.target.value)}
-                    placeholder="Ex: Frère Thomas"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Ville / Pays</label>
-                  <input
-                    type="text"
-                    value={prayerLocation}
-                    onChange={(e) => setPrayerLocation(e.target.value)}
-                    placeholder="Ex: Abidjan, Côte d'Ivoire"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Catégorie</label>
-                <select
-                  value={prayerCategory}
-                  onChange={(e) => setPrayerCategory(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
-                >
-                  <option value="Santé">Santé & Guérison</option>
-                  <option value="Paix & Famille">Paix & Famille</option>
-                  <option value="Emploi & Projets">Emploi & Projets</option>
-                  <option value="Foi & Orientation">Foi & Orientation</option>
-                  <option value="Action de Grâce">Action de Grâce</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Intention de prière</label>
-                <textarea
-                  required
-                  rows={4}
-                  value={prayerRequest}
-                  onChange={(e) => setPrayerRequest(e.target.value)}
-                  placeholder="Texte de la requête..."
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white resize-none"
-                />
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer text-amber-400 font-semibold">
-                <input
-                  type="checkbox"
-                  checked={prayerIsUrgent}
-                  onChange={(e) => setPrayerIsUrgent(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500"
-                />
-                <span>Intention Urgente</span>
-              </label>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow"
-                >
-                  {editingPrayer ? 'Enregistrer les modifications' : 'Publier la prière'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: ADD / EDIT BLOG POST */}
