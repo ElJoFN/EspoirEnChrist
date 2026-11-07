@@ -6,20 +6,29 @@ interface LogoProps {
   showText?: boolean;
 }
 
+const PRIMARY_LOGO_SRC = '/assets/aistudio/Logo_653519cb.jpeg';
+const FALLBACK_LOGO_SRC = '/logo.jpeg';
+const LEGACY_PUBLIC_SRC = '/public/assets/aistudio/Logo_653519cb.jpeg';
+
 export const Logo: React.FC<LogoProps> = ({
   className = '',
   size = 'md',
   showText = false,
 }) => {
-  const [processedSrc, setProcessedSrc] = useState<string>('/public/assets/aistudio/Logo_653519cb.jpeg');
+  const [processedSrc, setProcessedSrc] = useState<string>(PRIMARY_LOGO_SRC);
   const [isProcessed, setIsProcessed] = useState<boolean>(false);
 
   // Process image on client canvas to transparently strip white corners
   useEffect(() => {
+    let isMounted = true;
     const img = new Image();
     img.crossOrigin = 'Anonymous';
-    img.src = '/public/assets/aistudio/Logo_653519cb.jpeg';
+    
+    // Try primary path first
+    img.src = PRIMARY_LOGO_SRC;
+
     img.onload = () => {
+      if (!isMounted) return;
       try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -64,11 +73,28 @@ export const Logo: React.FC<LogoProps> = ({
         }
 
         ctx.putImageData(imgData, 0, 0);
-        setProcessedSrc(canvas.toDataURL('image/png'));
-        setIsProcessed(true);
+        const dataUrl = canvas.toDataURL('image/png');
+        if (isMounted) {
+          setProcessedSrc(dataUrl);
+          setIsProcessed(true);
+        }
       } catch (err) {
-        console.warn('Canvas image processing fallback to standard circular crop:', err);
+        // Fallback gracefully without throwing
+        if (isMounted) {
+          setProcessedSrc(PRIMARY_LOGO_SRC);
+        }
       }
+    };
+
+    img.onerror = () => {
+      // If primary path fails, try fallback logo.jpeg
+      if (img.src !== window.location.origin + FALLBACK_LOGO_SRC) {
+        img.src = FALLBACK_LOGO_SRC;
+      }
+    };
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -89,14 +115,18 @@ export const Logo: React.FC<LogoProps> = ({
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
       <div className={`relative ${dimensions} shrink-0 group`}>
-        {/* Main logo image badge - cleanly cropped with zero outer yellow ring or yellow glow */}
-        <div className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+        {/* Main logo image badge - cleanly cropped with zero outer yellow ring */}
+        <div className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 bg-slate-900">
           <img
             src={processedSrc}
             alt="Logo Espoir en Christ"
             className="w-full h-full object-cover rounded-full"
-            style={{
-              mixBlendMode: isProcessed ? 'normal' : 'normal',
+            onError={() => {
+              if (processedSrc === PRIMARY_LOGO_SRC) {
+                setProcessedSrc(FALLBACK_LOGO_SRC);
+              } else if (processedSrc === FALLBACK_LOGO_SRC) {
+                setProcessedSrc(LEGACY_PUBLIC_SRC);
+              }
             }}
           />
         </div>

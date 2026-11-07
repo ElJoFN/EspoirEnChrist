@@ -1,5 +1,7 @@
 import React from 'react';
 import { BookOpen, Heart, Sparkles, Users, CheckCircle2, Shield, Compass, Target } from 'lucide-react';
+import aboutFaithImg from '../assets/images/about_ministry_faith_1794053134401.jpg';
+import communityGatheringImg from '../assets/images/community_fellowship_gathering_1794053134732.jpg';
 
 export const AboutSection: React.FC = () => {
   // All three cards now have the exact same amber border contour as "Notre Mission"
@@ -150,7 +152,10 @@ export const AboutSection: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center mb-16">
           <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg relative group">
             <img
-              src="/src/assets/images/about_ministry_faith_1794053134401.jpg"
+              src={aboutFaithImg}
+              onError={(e) => {
+                e.currentTarget.src = '/images/about_ministry_faith_1794053134401.jpg';
+              }}
               alt="Méditation de la Parole"
               className="w-full h-72 sm:h-80 object-cover transition-transform duration-500 group-hover:scale-105"
             />
@@ -165,7 +170,10 @@ export const AboutSection: React.FC = () => {
 
           <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg relative group">
             <img
-              src="/src/assets/images/community_fellowship_gathering_1794053134732.jpg"
+              src={communityGatheringImg}
+              onError={(e) => {
+                e.currentTarget.src = '/images/community_fellowship_gathering_1794053134732.jpg';
+              }}
               alt="Rassemblement Espoir en Christ"
               className="w-full h-72 sm:h-80 object-cover transition-transform duration-500 group-hover:scale-105"
             />
