@@ -1339,20 +1339,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (window.confirm('Réinitialiser les prières par défaut ?')) {
-                      setPrayers(DEFAULT_PRAYERS);
-                      saveStoredPrayers(DEFAULT_PRAYERS);
-                    }
-                  }}
-                  className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-colors"
-                  title="Réinitialiser"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
+
             </div>
 
             {/* Filter categories */}
