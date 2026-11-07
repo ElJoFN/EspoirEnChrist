@@ -7,13 +7,6 @@ import {
   DEFAULT_EVENTS,
 } from '../data/events';
 import {
-  PrayerItem,
-  getStoredPrayers,
-  saveStoredPrayers,
-  DEFAULT_PRAYERS,
-  mergePrayers,
-} from '../data/prayers';
-import {
   BlogPost,
   getStoredBlogPosts,
   saveStoredBlogPosts,
@@ -36,9 +29,6 @@ import {
   fetchServerEvents,
   saveServerEvents,
   deleteServerEvent,
-  fetchServerPrayers,
-  saveServerPrayers,
-  deleteServerPrayer,
   fetchServerBlogPosts,
   saveServerBlogPosts,
   deleteServerBlogPost,
@@ -107,12 +97,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
   // Active Tab in Admin
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'events' | 'prayers' | 'blog' | 'messages' | 'supabase'
+    'overview' | 'events' | 'blog' | 'messages' | 'supabase'
   >('overview');
 
   // Data states
   const [events, setEvents] = useState<MinistryEvent[]>(() => getStoredEvents());
-  const [prayers, setPrayers] = useState<PrayerItem[]>(() => getStoredPrayers());
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => getStoredBlogPosts());
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>(() =>
     getStoredContactMessages()
@@ -163,7 +152,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
   // Search & filter states
   const [eventsFilter, setEventsFilter] = useState('Tous');
-  const [prayersFilter, setPrayersFilter] = useState('Tous');
   const [blogFilter, setBlogFilter] = useState('Tous');
   const [messagesFilter, setMessagesFilter] = useState<'Tous' | 'nouveau' | 'traite'>('Tous');
 
@@ -171,9 +159,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
   useEffect(() => {
     const syncAllData = async () => {
       try {
-        const [srvEvts, srvPrs, srvBps, srvMsgs] = await Promise.all([
+        const [srvEvts, srvBps, srvMsgs] = await Promise.all([
           fetchServerEvents(),
-          fetchServerPrayers(),
           fetchServerBlogPosts(),
           fetchServerMessages(),
         ]);
@@ -183,15 +170,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             if (JSON.stringify(prev) !== JSON.stringify(srvEvts)) {
               saveStoredEvents(srvEvts, false);
               return srvEvts;
-            }
-            return prev;
-          });
-        }
-        if (Array.isArray(srvPrs)) {
-          setPrayers((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(srvPrs)) {
-              saveStoredPrayers(srvPrs, false);
-              return srvPrs;
             }
             return prev;
           });
@@ -263,24 +241,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             saveStoredEvents(mapped);
           }
 
-          const { data: prs } = await client
-            .from('prayers')
-            .select('*')
-            .order('created_at', { ascending: false });
-          if (Array.isArray(prs)) {
-            const mappedPr = prs.map((d: any) => ({
-              id: d.id,
-              author: d.author,
-              location: d.location || undefined,
-              category: d.category,
-              request: d.request,
-              date: d.date,
-              prayersCount: d.prayers_count || 1,
-              isUrgent: Boolean(d.is_urgent),
-            }));
-            setPrayers(mappedPr);
-            saveStoredPrayers(mappedPr);
-          }
+
 
           const { data: bps } = await client
             .from('blog_posts')
@@ -419,20 +380,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
         });
       }
 
-      // 2. Sync Prayers
-      for (const pr of prayers) {
-        await client.from('prayers').upsert({
-          id: pr.id,
-          author: pr.author,
-          location: pr.location || null,
-          category: pr.category,
-          request: pr.request,
-          date: pr.date,
-          prayers_count: pr.prayersCount,
-          is_urgent: pr.isUrgent || false,
-          is_approved: true,
-        });
-      }
+
 
       // 3. Sync Blog Posts
       for (const bp of blogPosts) {
@@ -588,33 +536,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
 
 
-  const handleDeletePrayer = async (id: string) => {
-    if (!window.confirm('Supprimer cette intention de prière ?')) return;
-    const remaining = prayers.filter((p) => p.id !== id);
-    setPrayers(remaining);
-    saveStoredPrayers(remaining);
-    await deleteServerPrayer(id);
-    const client = getSupabaseClient();
-    if (client) {
-      try {
-        await client.from('prayers').delete().eq('id', id);
-      } catch (e) {}
-    }
-  };
 
-  const handleToggleUrgentPrayer = async (id: string) => {
-    const updated = prayers.map((p) => (p.id === id ? { ...p, isUrgent: !p.isUrgent } : p));
-    setPrayers(updated);
-    saveStoredPrayers(updated);
-    await saveServerPrayers(updated);
-  };
-
-  const handleIncrementPrayerCount = async (id: string) => {
-    const updated = prayers.map((p) => (p.id === id ? { ...p, prayersCount: p.prayersCount + 1 } : p));
-    setPrayers(updated);
-    saveStoredPrayers(updated);
-    await saveServerPrayers(updated);
-  };
 
   // Blog modal handlers
   const openNewBlogModal = () => {
@@ -754,10 +676,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
       ? events
       : events.filter((e) => e.category === eventsFilter);
 
-  const filteredPrayers =
-    prayersFilter === 'Tous'
-      ? prayers
-      : prayers.filter((p) => p.category === prayersFilter);
+
 
   const filteredBlogPosts =
     blogFilter === 'Tous'
@@ -952,7 +871,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             {[
               { id: 'overview', label: 'Vue d’ensemble', icon: Sparkles },
               { id: 'events', label: `Événements (${events.length})`, icon: Calendar },
-              { id: 'prayers', label: `Mur de Prières (${prayers.length})`, icon: HeartHandshake },
               { id: 'blog', label: `Blog & Partages (${blogPosts.length})`, icon: BookOpen },
               { id: 'messages', label: `Messages (${contactMessages.length})`, icon: Mail },
               { id: 'supabase', label: 'Base Supabase', icon: Database },
@@ -1058,25 +976,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                 <div className="text-xs text-slate-400 mt-1">Événements & Cultes programmés</div>
               </div>
 
-              <div
-                onClick={() => setActiveTab('prayers')}
-                className="bg-slate-900 border border-slate-800 hover:border-amber-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 group"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                    <HeartHandshake className="w-5 h-5" />
-                  </span>
-                  <span className="text-xs text-slate-500 group-hover:text-rose-400 flex items-center gap-0.5">
-                    Gérer <ChevronRight className="w-3 h-3" />
-                  </span>
-                </div>
-                <div className="text-2xl sm:text-3xl font-serif font-bold text-white">
-                  {prayers.length}
-                </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Prières sur le mur ({prayers.filter((p) => p.isUrgent).length} urgentes)
-                </div>
-              </div>
+
 
               <div
                 onClick={() => setActiveTab('blog')}
@@ -1164,46 +1064,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                 )}
               </div>
 
-              {/* Recent Prayer Requests */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-serif font-bold text-white flex items-center gap-2">
-                    <HeartHandshake className="w-4 h-4 text-rose-400" />
-                    Dernières Requêtes de Prière
-                  </h3>
-                  <button
-                    onClick={() => setActiveTab('prayers')}
-                    className="text-xs text-amber-400 hover:underline"
-                  >
-                    Tout voir
-                  </button>
-                </div>
 
-                <div className="space-y-3">
-                  {prayers.slice(0, 3).map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-xl text-xs space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-white flex items-center gap-1.5">
-                          {item.author}
-                          {item.isUrgent && (
-                            <span className="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.2 rounded border border-rose-500/30">
-                              Urgent
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{item.date}</span>
-                      </div>
-                      <p className="text-slate-300 text-[11px] truncate">"{item.request}"</p>
-                      <div className="text-[11px] text-amber-400 font-mono">
-                        {item.prayersCount} intercessions
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
             </div>
 
@@ -1323,107 +1184,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* 3. PRAYERS TAB */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'prayers' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-serif font-bold text-white flex items-center gap-2">
-                  <HeartHandshake className="w-6 h-6 text-amber-400" />
-                  Modération du Mur de Prières
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Gérez les intentions déposées par la communauté, marquez l'urgence et ajustez les compteurs.
-                </p>
-              </div>
 
-
-            </div>
-
-            {/* Filter categories */}
-            <div className="flex items-center gap-2 pb-2 overflow-x-auto no-scrollbar">
-              {['Tous', 'Santé', 'Paix & Famille', 'Emploi & Projets', 'Foi & Orientation', 'Action de Grâce'].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setPrayersFilter(cat)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                    prayersFilter === cat
-                      ? 'bg-amber-500 text-slate-950 font-bold'
-                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Prayer Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredPrayers.map((item) => (
-                <div
-                  key={item.id}
-                  className={`bg-slate-900 border rounded-2xl p-5 flex flex-col justify-between transition-all ${
-                    item.isUrgent ? 'border-amber-500/50 shadow-md shadow-amber-500/5' : 'border-slate-800'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                        {item.category}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDeletePrayer(item.id)}
-                          className="p-1 text-slate-400 hover:text-rose-400"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-white">{item.author}</span>
-                      <span className="text-[11px] text-slate-500">{item.date}</span>
-                    </div>
-
-                    {item.location && (
-                      <p className="text-[11px] text-slate-400 mb-2">📍 {item.location}</p>
-                    )}
-
-                    <p className="text-xs text-slate-300 leading-relaxed font-sans mb-4">
-                      "{item.request}"
-                    </p>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => handleToggleUrgentPrayer(item.id)}
-                      className={`text-[11px] px-2 py-1 rounded font-semibold transition-colors ${
-                        item.isUrgent
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                          : 'bg-slate-850 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {item.isUrgent ? '🚨 Urgent' : 'Normale'}
-                    </button>
-
-                    <button
-                      onClick={() => handleIncrementPrayerCount(item.id)}
-                      className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20"
-                      title="Incrémenter le nombre d'intercessions"
-                    >
-                      <Heart className="w-3 h-3 fill-amber-400" />
-                      <span>{item.prayersCount} prières (+1)</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ------------------------------------------------------------- */}
         {/* 4. BLOG & SHARES TAB */}
