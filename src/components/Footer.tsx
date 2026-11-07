@@ -1,18 +1,30 @@
 import React from 'react';
 import { Logo } from './Logo';
-import { ArrowUp, Calendar, HeartHandshake, Mail, Clock } from 'lucide-react';
+import { ArrowUp, Calendar, HeartHandshake, Mail, Clock, Lock } from 'lucide-react';
 
 interface FooterProps {
-  setActiveTab: (tab: 'home' | 'blog') => void;
+  setActiveTab: (tab: 'home' | 'blog' | 'admin') => void;
   setActiveSection: (sec: string) => void;
+  onOpenAdmin?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ setActiveTab, setActiveSection }) => {
+export const Footer: React.FC<FooterProps> = ({ setActiveTab, setActiveSection, onOpenAdmin }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNav = (secId: string) => {
+    if (secId === 'admin') {
+      if (onOpenAdmin) {
+        onOpenAdmin();
+      } else {
+        setActiveTab('admin');
+        window.history.pushState({}, '', '/admin');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (secId === 'blog') {
       setActiveTab('blog');
       setActiveSection('blog');
@@ -165,9 +177,20 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab, setActiveSection }
 
         </div>
 
-        {/* Bottom Bar: Copyright & Scroll to Top */}
+        {/* Bottom Bar: Copyright, Admin Link & Scroll to Top */}
         <div className="pt-6 sm:pt-8 border-t border-slate-200 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-          <p>© 2026 powered by Natech. Tous droits réservés.</p>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-center sm:text-left">
+            <p>© 2026 powered by Natech. Tous droits réservés.</p>
+            <span className="hidden sm:inline text-slate-300 dark:text-slate-700">·</span>
+            <button
+              onClick={() => handleNav('admin')}
+              className="text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors flex items-center gap-1 text-[11px]"
+              title="Portail Administrateur (admin.espoirenchrist.joel-fn.com)"
+            >
+              <Lock className="w-3 h-3 text-slate-400" />
+              <span>Espace Admin</span>
+            </button>
+          </div>
 
           <button
             onClick={scrollToTop}

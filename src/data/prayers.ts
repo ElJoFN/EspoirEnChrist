@@ -54,6 +54,33 @@ export const INITIAL_PRAYERS: PrayerItem[] = [
     request: "Louange à Dieu ! Après des semaines d'angoisse, le Seigneur a pourvu miraculeusement et les examens de ma fille sont excellents !",
     date: "Il y a 4 jours",
     prayersCount: 89
+  },
+  {
+    id: "p-106",
+    author: "Frère Joseph",
+    location: "Dakar, Sénégal",
+    category: "Foi & Orientation",
+    request: "Prions pour l'implantation d'un groupe d'étude biblique auprès des étudiants et pour que des cœurs soient réceptifs à l'Évangile.",
+    date: "Il y a 5 jours",
+    prayersCount: 34
+  },
+  {
+    id: "p-107",
+    author: "Famille Mercier",
+    location: "Bruxelles, Belgique",
+    category: "Paix & Famille",
+    request: "Demande de soutien dans la prière pour notre fils aîné en quête de sens. Que Dieu éclaire ses pas et le ramène à la bergerie.",
+    date: "Il y a 6 jours",
+    prayersCount: 61
+  },
+  {
+    id: "p-108",
+    author: "Sœur Christine",
+    location: "Kinshasa, RDC",
+    category: "Santé",
+    request: "Prière d'action de grâce pour la rémission et demande de persévérance pour la suite des soins médicaux sous la garde divine.",
+    date: "Il y a 1 semaine",
+    prayersCount: 75
   }
 ];
 

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds, DEFAULT_PRAYERS } from '../data/prayers';
-import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, Trash2, RefreshCw, Layers, Sparkles, Plus } from 'lucide-react';
+import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, Trash2, RefreshCw, Layers, Sparkles, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const PRAYERS_PER_PAGE = 6;
 
 export const PrayerWallSection: React.FC = () => {
   const [prayers, setPrayers] = useState<PrayerItem[]>(() => getStoredPrayers());
   const [prayedIds, setPrayedIds] = useState<Record<string, boolean>>(() => getStoredPrayedIds());
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [showFormModal, setShowFormModal] = useState<boolean>(false);
 
   // Admin dynamic test drawer toggle (like in EventsSection)
@@ -77,6 +80,7 @@ export const PrayerWallSection: React.FC = () => {
     const updated = [newPrayer, ...prayers];
     setPrayers(updated);
     saveStoredPrayers(updated);
+    setCurrentPage(1);
     setSubmittedMessage(true);
 
     setTimeout(() => {
@@ -108,6 +112,7 @@ export const PrayerWallSection: React.FC = () => {
     const updated = [created, ...prayers];
     setPrayers(updated);
     saveStoredPrayers(updated);
+    setCurrentPage(1);
 
     // Reset admin form
     setAdminAuthor('');
@@ -126,6 +131,7 @@ export const PrayerWallSection: React.FC = () => {
   const handleResetPrayers = () => {
     setPrayers(DEFAULT_PRAYERS);
     saveStoredPrayers(DEFAULT_PRAYERS);
+    setCurrentPage(1);
   };
 
   const categories = ['Tous', 'Santé', 'Paix & Famille', 'Emploi & Projets', 'Foi & Orientation', 'Action de Grâce'];
@@ -133,6 +139,21 @@ export const PrayerWallSection: React.FC = () => {
   const filteredPrayers = selectedCategory === 'Tous'
     ? prayers
     : prayers.filter((p) => p.category === selectedCategory);
+
+  // Pagination logic: if prayers exceed 6, paginate max 6 per page
+  const totalPrayers = filteredPrayers.length;
+  const totalPages = Math.ceil(totalPrayers / PRAYERS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safeCurrentPage - 1) * PRAYERS_PER_PAGE;
+  const paginatedPrayers = filteredPrayers.slice(startIndex, startIndex + PRAYERS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const element = document.getElementById('prieres');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <section id="prieres" className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors duration-200 relative">
@@ -282,7 +303,10 @@ export const PrayerWallSection: React.FC = () => {
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => {
+                setSelectedCategory(cat);
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
                 selectedCategory === cat
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
@@ -296,7 +320,7 @@ export const PrayerWallSection: React.FC = () => {
 
         {/* Prayer Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {filteredPrayers.map((item) => {
+          {paginatedPrayers.map((item) => {
             const hasPrayed = prayedIds[item.id];
             return (
               <div
@@ -370,6 +394,70 @@ export const PrayerWallSection: React.FC = () => {
             );
           })}
         </div>
+
+        {/* Empty state if category filter has 0 results */}
+        {filteredPrayers.length === 0 && (
+          <div className="py-12 text-center bg-white dark:bg-slate-950/60 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800">
+            <p className="text-sm text-slate-500">Aucune intention de prière trouvée dans cette catégorie.</p>
+            <button
+              onClick={() => {
+                setSelectedCategory('Tous');
+                setCurrentPage(1);
+              }}
+              className="mt-3 text-xs font-bold text-amber-700 dark:text-amber-400 underline"
+            >
+              Voir toutes les prières
+            </button>
+          </div>
+        )}
+
+        {/* Pagination Controls when requests exceed 6 (6 demandes max par page) */}
+        {totalPrayers > PRAYERS_PER_PAGE && (
+          <div className="mt-10 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+              Affichage de <span className="font-bold text-slate-900 dark:text-white">{startIndex + 1}</span> à{' '}
+              <span className="font-bold text-slate-900 dark:text-white">{Math.min(startIndex + PRAYERS_PER_PAGE, totalPrayers)}</span> sur{' '}
+              <span className="font-bold text-amber-700 dark:text-amber-400">{totalPrayers}</span> demandes de prière
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handlePageChange(safeCurrentPage - 1)}
+                disabled={safeCurrentPage === 1}
+                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95"
+                aria-label="Page précédente"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Précédent</span>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`w-9 h-9 flex items-center justify-center text-xs font-bold rounded-xl transition-all ${
+                    safeCurrentPage === pageNum
+                      ? 'bg-amber-500 text-slate-950 shadow-xs ring-2 ring-amber-400/50'
+                      : 'bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
+                  }`}
+                  aria-current={safeCurrentPage === pageNum ? 'page' : undefined}
+                >
+                  {pageNum}
+                </button>
+              ))}
+
+              <button
+                onClick={() => handlePageChange(safeCurrentPage + 1)}
+                disabled={safeCurrentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95"
+                aria-label="Page suivante"
+              >
+                <span className="hidden sm:inline">Suivant</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 

@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { BlogPost, getStoredBlogPosts, saveStoredBlogPosts, DEFAULT_BLOG_POSTS } from '../data/blogPosts';
-import { Newspaper, Sparkles, BookOpen, Heart, ArrowLeft, Send, Check, Search, Filter, Plus, Trash2, RefreshCw, Layers, Clock, User, X, Share2, Quote } from 'lucide-react';
+import { Newspaper, Sparkles, BookOpen, Heart, ArrowLeft, Send, Check, Search, Filter, Plus, Trash2, RefreshCw, Layers, Clock, User, X, Share2, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BlogPageProps {
   onBackToHome: () => void;
 }
 
+const POSTS_PER_PAGE = 6;
+
 export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
   const [posts, setPosts] = useState<BlogPost[]>(() => getStoredBlogPosts());
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [readingPost, setReadingPost] = useState<BlogPost | null>(null);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>(() => {
     try {
@@ -88,6 +91,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
     const updated = [created, ...posts];
     setPosts(updated);
     saveStoredBlogPosts(updated);
+    setCurrentPage(1);
 
     // Reset admin form
     setNewTitle('');
@@ -107,6 +111,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
   const handleResetPosts = () => {
     setPosts(DEFAULT_BLOG_POSTS);
     saveStoredBlogPosts(DEFAULT_BLOG_POSTS);
+    setCurrentPage(1);
   };
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
@@ -129,6 +134,18 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
       (post.biblicalReference && post.biblicalReference.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
+
+  // Pagination logic: max 6 articles per page; if filtered posts exceed 6, show pagination
+  const totalPosts = filteredPosts.length;
+  const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safeCurrentPage - 1) * POSTS_PER_PAGE;
+  const paginatedPosts = filteredPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="py-12 sm:py-16 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-[85vh] transition-colors duration-200">
@@ -309,7 +326,10 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
             {categories.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setCurrentPage(1);
+                }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
                   selectedCategory === cat
                     ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
@@ -327,7 +347,10 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Rechercher un article..."
               className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
             />
@@ -336,8 +359,8 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
         </div>
 
         {/* Articles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-          {filteredPosts.map((post) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+          {paginatedPosts.map((post) => {
             const hasLiked = likedPosts[post.id];
             return (
               <div
@@ -421,6 +444,71 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
             );
           })}
         </div>
+
+        {/* Empty state when search or filter returns no posts */}
+        {filteredPosts.length === 0 && (
+          <div className="py-12 text-center bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 mb-12">
+            <p className="text-sm text-slate-500">Aucun article ne correspond à votre recherche.</p>
+            <button
+              onClick={() => {
+                setSelectedCategory('Tous');
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
+              className="mt-3 text-xs font-bold text-amber-700 dark:text-amber-400 underline"
+            >
+              Réinitialiser les filtres
+            </button>
+          </div>
+        )}
+
+        {/* Pagination Controls when articles exceed 6 (6 articles max par page) */}
+        {totalPosts > POSTS_PER_PAGE && (
+          <div className="mt-4 mb-16 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+              Affichage de <span className="font-bold text-slate-900 dark:text-white">{startIndex + 1}</span> à{' '}
+              <span className="font-bold text-slate-900 dark:text-white">{Math.min(startIndex + POSTS_PER_PAGE, totalPosts)}</span> sur{' '}
+              <span className="font-bold text-amber-700 dark:text-amber-400">{totalPosts}</span> articles
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handlePageChange(safeCurrentPage - 1)}
+                disabled={safeCurrentPage === 1}
+                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95"
+                aria-label="Page précédente"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Précédent</span>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`w-9 h-9 flex items-center justify-center text-xs font-bold rounded-xl transition-all ${
+                    safeCurrentPage === pageNum
+                      ? 'bg-amber-500 text-slate-950 shadow-xs ring-2 ring-amber-400/50'
+                      : 'bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
+                  }`}
+                  aria-current={safeCurrentPage === pageNum ? 'page' : undefined}
+                >
+                  {pageNum}
+                </button>
+              ))}
+
+              <button
+                onClick={() => handlePageChange(safeCurrentPage + 1)}
+                disabled={safeCurrentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95"
+                aria-label="Page suivante"
+              >
+                <span className="hidden sm:inline">Suivant</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Newsletter Subscription Card */}
         <div className="max-w-2xl mx-auto p-6 sm:p-8 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl text-center shadow-sm">

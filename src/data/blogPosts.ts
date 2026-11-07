@@ -96,6 +96,72 @@ Remarquez la clé souvent négligée : « avec des actions de grâces ».
 Remercier Dieu AVANT même de voir l'exaucement visible est l'acte de foi le plus élevé. Cela signifie : « Seigneur, je ne vois pas encore la solution de mes yeux physiques, mais je te remercie déjà parce que Tu es fidèle et que Tu es à l'œuvre. »
 
 Faites l'expérience dès aujourd'hui : listez 5 sujets de reconnaissance envers Dieu pour chaque motif d'inquiétude qui se présente à votre esprit.`
+  },
+  {
+    id: "post-5",
+    title: "La fidélité de Dieu dans le désert : Pourquoi l'attente fortifie la foi",
+    category: "Méditation",
+    author: "Pasteur David",
+    date: "22 Octobre 2026",
+    readTime: "5 min",
+    biblicalReference: "Ésaïe 40:31",
+    likesCount: 78,
+    featured: false,
+    snippet: "Ceux qui s'attendent à l'Éternel renouvellent leur force. L'attente n'est pas du temps perdu, mais le temps où Dieu façonne notre caractère.",
+    content: `Dans la culture moderne de l'instantanéité, attendre est souvent perçu comme un échec ou une perte de temps. Pourtant, dans le plan de Dieu, le désert est l'école de la maturité.
+
+Moïse a passé 40 ans au désert avant d'entrer dans son appel. David a attendu des années après avoir été oint roi avant de monter sur le trône.
+
+Dans ces périodes de silence apparent, Dieu n'est pas inactif : Il prépare notre cœur à porter la bénédiction sans nous égarer. Rappelez-vous chaque jour : « Il a promis, Il accomplira ! »`
+  },
+  {
+    id: "post-6",
+    title: "Comment pardonner quand la blessure est profonde ?",
+    category: "Enseignement",
+    author: "Équipe Pastorale",
+    date: "17 Octobre 2026",
+    readTime: "6 min",
+    biblicalReference: "Colossiens 3:13",
+    likesCount: 112,
+    featured: false,
+    snippet: "Le pardon n'est pas une émotion, c'est une décision d'obéissance qui libère notre propre âme de la prison de l'amertume.",
+    content: `Beaucoup confondent le pardon avec l'oubli immédiat ou l'approbation de l'offense. Pardonner ne veut pas dire déclarer que le mal commis n'était pas grave.
+
+Pardonner signifie remettre la justice entre les mains de Dieu et refuser de nourrir la rancune. Comme Christ nous a pardonné alors que nous étions pécheurs, nous sommes appelés à relâcher ceux qui nous ont blessés.
+
+Le premier bénéficiaire du pardon n'est pas le coupable, c'est celui qui pardonne : les chaînes du passé sont brisées.`
+  },
+  {
+    id: "post-7",
+    title: "L'importance vitale de la communion fraternelle au XXIe siècle",
+    category: "Vie Chrétienne",
+    author: "Samuel & Esther",
+    date: "11 Octobre 2026",
+    readTime: "5 min",
+    biblicalReference: "Hébreux 10:24-25",
+    likesCount: 59,
+    featured: false,
+    snippet: "Nous n'avons pas été créés pour marcher seuls. Découvrons la richesse de l'édification mutuelle et du soutien communautaire.",
+    content: `Un charbon ardent isolé s'éteint rapidement, mais réuni avec d'autres charbons, il conserve sa chaleur et entretient une flamme vive.
+
+La vie chrétienne est intrinsèquement communautaire. Prier les uns pour les autres, partager les fardeaux, célébrer les victoires ensemble sont les piliers d'une foi vivante et inébranlable.`
+  },
+  {
+    id: "post-8",
+    title: "Témoignage : Guéri de l'amertume après 10 ans de rupture familiale",
+    category: "Témoignage",
+    author: "Alain K.",
+    date: "5 Octobre 2026",
+    readTime: "8 min",
+    biblicalReference: "Luc 15:20-24",
+    likesCount: 134,
+    featured: false,
+    snippet: "Dieu a réconcilié ce que tous croyaient brisé à jamais. Voici comment l'amour du Christ a restauré notre famille.",
+    content: `Pendant une décennie, un mur d'incompréhension et de silence s'était érigé entre mon frère et moi. Chaque tentative humaine de rapprochement échouait.
+
+C'est lors d'une veillée de prière sur le thème de la réconciliation que le Saint-Esprit m'a convaincu d'abandonner mon orgueil et de faire le premier pas. J'ai envoyé un simple message de paix et de pardon.
+
+Dieu a touché son cœur au même instant. Les larmes ont effacé dix années de ressentiment. Rien n'est impossible à notre Dieu fidèle.`
   }
 ];
 

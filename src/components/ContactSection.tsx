@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Send, CheckCircle, HelpCircle, ChevronDown, Sparkles } from 'lucide-react';
 
+import { ContactMessage, getStoredContactMessages, saveStoredContactMessages } from '../data/contactMessages';
+import { getSupabaseClient } from '../services/supabase';
+
 export const ContactSection: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -12,27 +15,24 @@ export const ContactSection: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
-  const [savedMessages, setSavedMessages] = useState<any[]>(() => {
-    const s = localStorage.getItem('espoir_contact_history');
-    return s ? JSON.parse(s) : [];
-  });
+  const [savedMessages, setSavedMessages] = useState<ContactMessage[]>(() => getStoredContactMessages());
 
   useEffect(() => {
-    localStorage.setItem('espoir_contact_history', JSON.stringify(savedMessages));
+    saveStoredContactMessages(savedMessages);
   }, [savedMessages]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !message) return;
 
-    const newMsg = {
-      id: Date.now(),
-      name,
-      email,
-      phone,
+    const newMsg: ContactMessage = {
+      id: `msg-${Date.now()}`,
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim() || undefined,
       requestType,
-      subject,
-      message,
+      subject: subject.trim() || undefined,
+      message: message.trim(),
       requestCallback,
       date: new Date().toLocaleDateString('fr-FR', {
         day: 'numeric',
@@ -41,10 +41,36 @@ export const ContactSection: React.FC = () => {
         hour: '2-digit',
         minute: '2-digit',
       }),
+      status: 'nouveau',
     };
 
-    setSavedMessages([newMsg, ...savedMessages]);
+    const updated = [newMsg, ...savedMessages];
+    setSavedMessages(updated);
+    saveStoredContactMessages(updated);
     setIsSubmitted(true);
+
+    // If Supabase is connected, persist remotely
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase.from('contact_messages').insert([
+          {
+            id: newMsg.id,
+            name: newMsg.name,
+            email: newMsg.email,
+            phone: newMsg.phone,
+            request_type: newMsg.requestType,
+            subject: newMsg.subject,
+            message: newMsg.message,
+            request_callback: newMsg.requestCallback,
+            date: newMsg.date,
+            status: 'nouveau',
+          },
+        ]);
+      } catch (err) {
+        console.warn('Could not sync contact message to Supabase:', err);
+      }
+    }
 
     setTimeout(() => {
       setName('');

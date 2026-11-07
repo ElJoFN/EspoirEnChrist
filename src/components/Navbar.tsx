@@ -3,8 +3,8 @@ import { Logo } from './Logo';
 import { Sun, Moon, Menu, X, HeartHandshake } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'home' | 'blog';
-  setActiveTab: (tab: 'home' | 'blog') => void;
+  activeTab: 'home' | 'blog' | 'admin';
+  setActiveTab: (tab: 'home' | 'blog' | 'admin') => void;
   activeSection: string;
   setActiveSection: (section: string) => void;
   isDarkMode: boolean;
