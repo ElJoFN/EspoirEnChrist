@@ -70,10 +70,14 @@ export const getStoredEvents = (): MinistryEvent[] => {
   }
 };
 
-export const saveStoredEvents = (events: MinistryEvent[]): void => {
+export const saveStoredEvents = (events: MinistryEvent[], notify: boolean = false): void => {
   try {
-    localStorage.setItem('espoir_dynamic_events', JSON.stringify(events));
-    if (typeof window !== 'undefined') {
+    const current = localStorage.getItem('espoir_dynamic_events');
+    const newStr = JSON.stringify(events);
+    if (current !== newStr) {
+      localStorage.setItem('espoir_dynamic_events', newStr);
+    }
+    if (notify && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'events' } }));
     }
   } catch (e) {

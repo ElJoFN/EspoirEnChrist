@@ -178,10 +178,14 @@ export const getStoredBlogPosts = (): BlogPost[] => {
   }
 };
 
-export const saveStoredBlogPosts = (posts: BlogPost[]): void => {
+export const saveStoredBlogPosts = (posts: BlogPost[], notify: boolean = false): void => {
   try {
-    localStorage.setItem('espoir_dynamic_blog_posts', JSON.stringify(posts));
-    if (typeof window !== 'undefined') {
+    const current = localStorage.getItem('espoir_dynamic_blog_posts');
+    const newStr = JSON.stringify(posts);
+    if (current !== newStr) {
+      localStorage.setItem('espoir_dynamic_blog_posts', newStr);
+    }
+    if (notify && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'blog' } }));
     }
   } catch (e) {

@@ -14,11 +14,14 @@ export const EventsSection: React.FC = () => {
     const loadEvents = async () => {
       // 1. Fetch from real-time full-stack server API
       const serverEvts = await fetchServerEvents();
-      if (serverEvts && Array.isArray(serverEvts) && serverEvts.length >= 0) {
-        setEvents(serverEvts);
-        saveStoredEvents(serverEvts);
-      } else {
-        setEvents(getStoredEvents());
+      if (Array.isArray(serverEvts)) {
+        setEvents((prev) => {
+          if (JSON.stringify(prev) !== JSON.stringify(serverEvts)) {
+            saveStoredEvents(serverEvts, false);
+            return serverEvts;
+          }
+          return prev;
+        });
       }
 
       // 2. If Supabase is connected, fetch live events
@@ -30,7 +33,7 @@ export const EventsSection: React.FC = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped: MinistryEvent[] = data.map((d: any) => ({
               id: d.id,
               title: d.title,
@@ -42,8 +45,13 @@ export const EventsSection: React.FC = () => {
               isOnlineAvailable: Boolean(d.is_online_available),
               speaker: d.speaker || undefined,
             }));
-            setEvents(mapped);
-            saveStoredEvents(mapped);
+            setEvents((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(mapped)) {
+                saveStoredEvents(mapped, false);
+                return mapped;
+              }
+              return prev;
+            });
           }
         } catch (e) {
           console.warn('Supabase fetch events error:', e);
@@ -53,28 +61,20 @@ export const EventsSection: React.FC = () => {
 
     loadEvents();
 
-    // Poll server API every 4s for cross-device real-time sync
-    const interval = setInterval(loadEvents, 4000);
+    // Poll server API every 6s for cross-device real-time sync
+    const interval = setInterval(loadEvents, 6000);
 
-    // Listen for updates from Admin page or another tab
+    // Listen for updates from Admin page
     const handleDataUpdate = (e: any) => {
       if (!e.detail || e.detail.type === 'events') {
         loadEvents();
       }
     };
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'espoir_dynamic_events') {
-        setEvents(getStoredEvents());
-      }
-    };
-
     window.addEventListener('espoir_data_updated', handleDataUpdate);
-    window.addEventListener('storage', handleStorageChange);
     return () => {
       clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

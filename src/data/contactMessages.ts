@@ -56,10 +56,14 @@ export const getStoredContactMessages = (): ContactMessage[] => {
   }
 };
 
-export const saveStoredContactMessages = (messages: ContactMessage[]): void => {
+export const saveStoredContactMessages = (messages: ContactMessage[], notify: boolean = false): void => {
   try {
-    localStorage.setItem('espoir_contact_history', JSON.stringify(messages));
-    if (typeof window !== 'undefined') {
+    const current = localStorage.getItem('espoir_contact_history');
+    const newStr = JSON.stringify(messages);
+    if (current !== newStr) {
+      localStorage.setItem('espoir_contact_history', newStr);
+    }
+    if (notify && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'messages' } }));
     }
   } catch (e) {

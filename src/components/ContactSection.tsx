@@ -15,12 +15,7 @@ export const ContactSection: React.FC = () => {
   const [requestCallback, setRequestCallback] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-
   const [savedMessages, setSavedMessages] = useState<ContactMessage[]>(() => getStoredContactMessages());
-
-  useEffect(() => {
-    saveStoredContactMessages(savedMessages);
-  }, [savedMessages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +42,7 @@ export const ContactSection: React.FC = () => {
 
     const updated = [newMsg, ...savedMessages];
     setSavedMessages(updated);
-    saveStoredContactMessages(updated);
+    saveStoredContactMessages(updated, true);
     setIsSubmitted(true);
 
     // Sync to Server API for cross-device real-time visibility in Admin

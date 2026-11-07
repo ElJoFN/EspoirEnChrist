@@ -99,10 +99,14 @@ export const getStoredPrayers = (): PrayerItem[] => {
   }
 };
 
-export const saveStoredPrayers = (prayers: PrayerItem[]): void => {
+export const saveStoredPrayers = (prayers: PrayerItem[], notify: boolean = false): void => {
   try {
-    localStorage.setItem('espoir_dynamic_prayers', JSON.stringify(prayers));
-    if (typeof window !== 'undefined') {
+    const current = localStorage.getItem('espoir_dynamic_prayers');
+    const newStr = JSON.stringify(prayers);
+    if (current !== newStr) {
+      localStorage.setItem('espoir_dynamic_prayers', newStr);
+    }
+    if (notify && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'prayers' } }));
     }
   } catch (e) {

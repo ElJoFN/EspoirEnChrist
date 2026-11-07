@@ -28,10 +28,13 @@ export const PrayerWallSection: React.FC = () => {
       // 1. Fetch from real-time full-stack server API
       const serverPrayers = await fetchServerPrayers();
       if (Array.isArray(serverPrayers)) {
-        setPrayers(serverPrayers);
-        saveStoredPrayers(serverPrayers);
-      } else {
-        setPrayers(getStoredPrayers());
+        setPrayers((prev) => {
+          if (JSON.stringify(prev) !== JSON.stringify(serverPrayers)) {
+            saveStoredPrayers(serverPrayers, false);
+            return serverPrayers;
+          }
+          return prev;
+        });
       }
 
       // 2. If Supabase is connected, fetch live prayers
@@ -43,7 +46,7 @@ export const PrayerWallSection: React.FC = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped: PrayerItem[] = data.map((d: any) => ({
               id: d.id,
               author: d.author,
@@ -54,8 +57,13 @@ export const PrayerWallSection: React.FC = () => {
               prayersCount: d.prayers_count || 1,
               isUrgent: Boolean(d.is_urgent),
             }));
-            setPrayers(mapped);
-            saveStoredPrayers(mapped);
+            setPrayers((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(mapped)) {
+                saveStoredPrayers(mapped, false);
+                return mapped;
+              }
+              return prev;
+            });
           }
         } catch (e) {
           console.warn('Supabase fetch prayers error:', e);
@@ -65,28 +73,20 @@ export const PrayerWallSection: React.FC = () => {
 
     loadPrayers();
 
-    // Poll server API every 4s for cross-device real-time sync
-    const interval = setInterval(loadPrayers, 4000);
+    // Poll server API every 6s for cross-device real-time sync
+    const interval = setInterval(loadPrayers, 6000);
 
-    // Listen for updates from Admin page or another tab
+    // Listen for updates from Admin page
     const handleDataUpdate = (e: any) => {
       if (!e.detail || e.detail.type === 'prayers') {
         loadPrayers();
       }
     };
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'espoir_dynamic_prayers') {
-        setPrayers(getStoredPrayers());
-      }
-    };
-
     window.addEventListener('espoir_data_updated', handleDataUpdate);
-    window.addEventListener('storage', handleStorageChange);
     return () => {
       clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -104,7 +104,7 @@ export const PrayerWallSection: React.FC = () => {
       item.id === id ? { ...item, prayersCount: newCount } : item
     );
     setPrayers(updated);
-    saveStoredPrayers(updated);
+    saveStoredPrayers(updated, false);
 
     const updatedPrayedIds = { ...prayedIds, [id]: true };
     setPrayedIds(updatedPrayedIds);
@@ -139,7 +139,7 @@ export const PrayerWallSection: React.FC = () => {
 
     const updated = [newPrayer, ...prayers];
     setPrayers(updated);
-    saveStoredPrayers(updated);
+    saveStoredPrayers(updated, true);
     setCurrentPage(1);
     setSubmittedMessage(true);
 

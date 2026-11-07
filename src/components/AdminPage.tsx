@@ -174,24 +174,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
   const [blogFilter, setBlogFilter] = useState('Tous');
   const [messagesFilter, setMessagesFilter] = useState<'Tous' | 'nouveau' | 'traite'>('Tous');
 
-  // Synchronize data changes to localStorage
-  useEffect(() => {
-    saveStoredEvents(events);
-  }, [events]);
-
-  useEffect(() => {
-    saveStoredPrayers(prayers);
-  }, [prayers]);
-
-  useEffect(() => {
-    saveStoredBlogPosts(blogPosts);
-  }, [blogPosts]);
-
-  useEffect(() => {
-    saveStoredContactMessages(contactMessages);
-  }, [contactMessages]);
-
-  // Listen for real-time visitor submissions (prayers, contact messages, etc.) & poll server
+  // Listen for real-time visitor submissions & poll server safely
   useEffect(() => {
     const syncAllData = async () => {
       try {
@@ -203,43 +186,57 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
         ]);
 
         if (Array.isArray(srvEvts)) {
-          setEvents(srvEvts);
-          saveStoredEvents(srvEvts);
+          setEvents((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(srvEvts)) {
+              saveStoredEvents(srvEvts, false);
+              return srvEvts;
+            }
+            return prev;
+          });
         }
         if (Array.isArray(srvPrs)) {
-          setPrayers(srvPrs);
-          saveStoredPrayers(srvPrs);
+          setPrayers((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(srvPrs)) {
+              saveStoredPrayers(srvPrs, false);
+              return srvPrs;
+            }
+            return prev;
+          });
         }
         if (Array.isArray(srvBps)) {
-          setBlogPosts(srvBps);
-          saveStoredBlogPosts(srvBps);
+          setBlogPosts((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(srvBps)) {
+              saveStoredBlogPosts(srvBps, false);
+              return srvBps;
+            }
+            return prev;
+          });
         }
         if (Array.isArray(srvMsgs)) {
-          setContactMessages(srvMsgs);
-          saveStoredContactMessages(srvMsgs);
+          setContactMessages((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(srvMsgs)) {
+              saveStoredContactMessages(srvMsgs, false);
+              return srvMsgs;
+            }
+            return prev;
+          });
         }
       } catch (e) {}
     };
 
     syncAllData();
 
-    // 4s polling for cross-device real-time sync
-    const interval = setInterval(syncAllData, 4000);
+    // 6s polling for cross-device real-time sync without burning CPU
+    const interval = setInterval(syncAllData, 6000);
 
     const handleDataUpdate = (e: any) => {
       syncAllData();
     };
 
-    const handleStorageChange = (e: StorageEvent) => {
-      syncAllData();
-    };
-
     window.addEventListener('espoir_data_updated', handleDataUpdate);
-    window.addEventListener('storage', handleStorageChange);
     return () => {
       clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
