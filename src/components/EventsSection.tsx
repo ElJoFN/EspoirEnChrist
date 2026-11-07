@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MinistryEvent, getStoredEvents, saveStoredEvents } from '../data/events';
 import { getSupabaseClient } from '../services/supabase';
+import { fetchServerEvents } from '../services/api';
 import { Calendar, Clock, MapPin, Video, Download, Check, User, ExternalLink } from 'lucide-react';
 
 export const EventsSection: React.FC = () => {
@@ -8,11 +9,17 @@ export const EventsSection: React.FC = () => {
   const [downloadedEvtId, setDownloadedEvtId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
 
-  // Load and synchronize events with Supabase & localStorage
+  // Load and synchronize events with Server API, Supabase & localStorage
   useEffect(() => {
     const loadEvents = async () => {
-      // 1. Immediately sync with local storage
-      setEvents(getStoredEvents());
+      // 1. Fetch from real-time full-stack server API
+      const serverEvts = await fetchServerEvents();
+      if (serverEvts && Array.isArray(serverEvts) && serverEvts.length >= 0) {
+        setEvents(serverEvts);
+        saveStoredEvents(serverEvts);
+      } else {
+        setEvents(getStoredEvents());
+      }
 
       // 2. If Supabase is connected, fetch live events
       const supabase = getSupabaseClient();
@@ -23,7 +30,7 @@ export const EventsSection: React.FC = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             const mapped: MinistryEvent[] = data.map((d: any) => ({
               id: d.id,
               title: d.title,
@@ -46,10 +53,13 @@ export const EventsSection: React.FC = () => {
 
     loadEvents();
 
+    // Poll server API every 4s for cross-device real-time sync
+    const interval = setInterval(loadEvents, 4000);
+
     // Listen for updates from Admin page or another tab
     const handleDataUpdate = (e: any) => {
       if (!e.detail || e.detail.type === 'events') {
-        setEvents(getStoredEvents());
+        loadEvents();
       }
     };
 
@@ -62,6 +72,7 @@ export const EventsSection: React.FC = () => {
     window.addEventListener('espoir_data_updated', handleDataUpdate);
     window.addEventListener('storage', handleStorageChange);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
       window.removeEventListener('storage', handleStorageChange);
     };

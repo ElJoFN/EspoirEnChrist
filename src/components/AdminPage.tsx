@@ -33,6 +33,20 @@ import {
   SUPABASE_SQL_SCHEMA,
 } from '../services/supabase';
 import {
+  fetchServerEvents,
+  saveServerEvents,
+  deleteServerEvent,
+  fetchServerPrayers,
+  saveServerPrayers,
+  deleteServerPrayer,
+  fetchServerBlogPosts,
+  saveServerBlogPosts,
+  deleteServerBlogPost,
+  fetchServerMessages,
+  saveServerMessages,
+  deleteServerMessage,
+} from '../services/api';
+import {
   Lock,
   Unlock,
   Key,
@@ -177,34 +191,53 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     saveStoredContactMessages(contactMessages);
   }, [contactMessages]);
 
-  // Listen for real-time visitor submissions (prayers, contact messages, etc.)
+  // Listen for real-time visitor submissions (prayers, contact messages, etc.) & poll server
   useEffect(() => {
+    const syncAllData = async () => {
+      try {
+        const [srvEvts, srvPrs, srvBps, srvMsgs] = await Promise.all([
+          fetchServerEvents(),
+          fetchServerPrayers(),
+          fetchServerBlogPosts(),
+          fetchServerMessages(),
+        ]);
+
+        if (Array.isArray(srvEvts)) {
+          setEvents(srvEvts);
+          saveStoredEvents(srvEvts);
+        }
+        if (Array.isArray(srvPrs)) {
+          setPrayers(srvPrs);
+          saveStoredPrayers(srvPrs);
+        }
+        if (Array.isArray(srvBps)) {
+          setBlogPosts(srvBps);
+          saveStoredBlogPosts(srvBps);
+        }
+        if (Array.isArray(srvMsgs)) {
+          setContactMessages(srvMsgs);
+          saveStoredContactMessages(srvMsgs);
+        }
+      } catch (e) {}
+    };
+
+    syncAllData();
+
+    // 4s polling for cross-device real-time sync
+    const interval = setInterval(syncAllData, 4000);
+
     const handleDataUpdate = (e: any) => {
-      const type = e?.detail?.type;
-      if (!type || type === 'prayers') {
-        setPrayers(getStoredPrayers());
-      }
-      if (!type || type === 'events') {
-        setEvents(getStoredEvents());
-      }
-      if (!type || type === 'blog') {
-        setBlogPosts(getStoredBlogPosts());
-      }
-      if (!type || type === 'messages') {
-        setContactMessages(getStoredContactMessages());
-      }
+      syncAllData();
     };
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'espoir_dynamic_prayers') setPrayers(getStoredPrayers());
-      if (e.key === 'espoir_dynamic_events') setEvents(getStoredEvents());
-      if (e.key === 'espoir_dynamic_blog_posts') setBlogPosts(getStoredBlogPosts());
-      if (e.key === 'espoir_contact_history') setContactMessages(getStoredContactMessages());
+      syncAllData();
     };
 
     window.addEventListener('espoir_data_updated', handleDataUpdate);
     window.addEventListener('storage', handleStorageChange);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -525,6 +558,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     setEvents(updatedList);
     saveStoredEvents(updatedList);
 
+    // Sync to Server API for cross-device real-time sync
+    await saveServerEvents(updatedList);
+
     // Try Supabase sync in background
     const client = getSupabaseClient();
     if (client) {
@@ -551,6 +587,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     const remaining = events.filter((e) => e.id !== id);
     setEvents(remaining);
     saveStoredEvents(remaining);
+    await deleteServerEvent(id);
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -615,6 +652,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     setPrayers(updatedPrayers);
     saveStoredPrayers(updatedPrayers);
 
+    // Sync to Server API for cross-device visibility
+    await saveServerPrayers(updatedPrayers);
+
     // Try Supabase sync
     const client = getSupabaseClient();
     if (client) {
@@ -641,6 +681,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     const remaining = prayers.filter((p) => p.id !== id);
     setPrayers(remaining);
     saveStoredPrayers(remaining);
+    await deleteServerPrayer(id);
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -649,16 +690,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     }
   };
 
-  const handleToggleUrgentPrayer = (id: string) => {
+  const handleToggleUrgentPrayer = async (id: string) => {
     const updated = prayers.map((p) => (p.id === id ? { ...p, isUrgent: !p.isUrgent } : p));
     setPrayers(updated);
     saveStoredPrayers(updated);
+    await saveServerPrayers(updated);
   };
 
-  const handleIncrementPrayerCount = (id: string) => {
+  const handleIncrementPrayerCount = async (id: string) => {
     const updated = prayers.map((p) => (p.id === id ? { ...p, prayersCount: p.prayersCount + 1 } : p));
     setPrayers(updated);
     saveStoredPrayers(updated);
+    await saveServerPrayers(updated);
   };
 
   // Blog modal handlers
@@ -734,6 +777,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     }
     setBlogPosts(updatedPosts);
     saveStoredBlogPosts(updatedPosts);
+    await saveServerBlogPosts(updatedPosts);
 
     // Supabase sync
     const client = getSupabaseClient();
@@ -763,6 +807,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     const remaining = blogPosts.filter((p) => p.id !== id);
     setBlogPosts(remaining);
     saveStoredBlogPosts(remaining);
+    await deleteServerBlogPost(id);
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -772,19 +817,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
   };
 
   // Contact Message Handlers
-  const handleToggleMessageStatus = (id: string) => {
-    setContactMessages(
-      contactMessages.map((m) =>
-        m.id === id
-          ? { ...m, status: m.status === 'nouveau' ? 'traite' : 'nouveau' }
-          : m
-      )
+  const handleToggleMessageStatus = async (id: string) => {
+    const updated = contactMessages.map((m) =>
+      m.id === id
+        ? { ...m, status: m.status === 'nouveau' ? ('traite' as const) : ('nouveau' as const) }
+        : m
     );
+    setContactMessages(updated);
+    saveStoredContactMessages(updated);
+    await saveServerMessages(updated);
   };
 
-  const handleDeleteContactMessage = (id: string) => {
+  const handleDeleteContactMessage = async (id: string) => {
     if (!window.confirm('Supprimer ce message de contact ?')) return;
-    setContactMessages(contactMessages.filter((m) => m.id !== id));
+    const remaining = contactMessages.filter((m) => m.id !== id);
+    setContactMessages(remaining);
+    saveStoredContactMessages(remaining);
+    await deleteServerMessage(id);
   };
 
   // Filtered lists

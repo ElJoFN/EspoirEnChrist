@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BlogPost, getStoredBlogPosts, saveStoredBlogPosts } from '../data/blogPosts';
 import { getSupabaseClient } from '../services/supabase';
+import { fetchServerBlogPosts } from '../services/api';
 import { BookOpen, Heart, ArrowLeft, Send, Check, Search, Filter, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BlogPageProps {
@@ -28,11 +29,17 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
-  // Load and sync blog posts with Supabase and localStorage
+  // Load and sync blog posts with Server API, Supabase and localStorage
   useEffect(() => {
     const loadBlogPosts = async () => {
-      // 1. Immediately sync with local storage
-      setPosts(getStoredBlogPosts());
+      // 1. Fetch from server API
+      const serverBps = await fetchServerBlogPosts();
+      if (Array.isArray(serverBps)) {
+        setPosts(serverBps);
+        saveStoredBlogPosts(serverBps);
+      } else {
+        setPosts(getStoredBlogPosts());
+      }
 
       // 2. If Supabase is connected, fetch live posts
       const supabase = getSupabaseClient();
@@ -68,22 +75,26 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
 
     loadBlogPosts();
 
+    // Poll server API every 4s for cross-device real-time sync
+    const interval = setInterval(loadBlogPosts, 4000);
+
     // Listen for updates from Admin page or another tab
     const handleDataUpdate = (e: any) => {
       if (!e.detail || e.detail.type === 'blog') {
-        setPosts(getStoredBlogPosts());
+        loadBlogPosts();
       }
     };
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'espoir_dynamic_blog_posts') {
-        setPosts(getStoredBlogPosts());
+        loadBlogPosts();
       }
     };
 
     window.addEventListener('espoir_data_updated', handleDataUpdate);
     window.addEventListener('storage', handleStorageChange);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
       window.removeEventListener('storage', handleStorageChange);
     };

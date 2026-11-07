@@ -3,6 +3,7 @@ import { Send, CheckCircle, HelpCircle, ChevronDown, Sparkles } from 'lucide-rea
 
 import { ContactMessage, getStoredContactMessages, saveStoredContactMessages } from '../data/contactMessages';
 import { getSupabaseClient } from '../services/supabase';
+import { saveServerMessages } from '../services/api';
 
 export const ContactSection: React.FC = () => {
   const [name, setName] = useState('');
@@ -48,6 +49,9 @@ export const ContactSection: React.FC = () => {
     setSavedMessages(updated);
     saveStoredContactMessages(updated);
     setIsSubmitted(true);
+
+    // Sync to Server API for cross-device real-time visibility in Admin
+    await saveServerMessages(newMsg);
 
     // If Supabase is connected, persist remotely
     const supabase = getSupabaseClient();

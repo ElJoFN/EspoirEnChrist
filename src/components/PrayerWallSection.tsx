@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds, mergePrayers } from '../data/prayers';
+import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds } from '../data/prayers';
 import { getSupabaseClient } from '../services/supabase';
+import { fetchServerPrayers, saveServerPrayers } from '../services/api';
 import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PRAYERS_PER_PAGE = 6;
@@ -21,12 +22,17 @@ export const PrayerWallSection: React.FC = () => {
   const [isUrgent, setIsUrgent] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState(false);
 
-  // Load prayers and sync with Supabase & local storage
+  // Load prayers from Server API & Supabase for cross-device sync
   useEffect(() => {
     const loadPrayers = async () => {
-      // 1. Immediately sync with local storage
-      const local = getStoredPrayers();
-      setPrayers(local);
+      // 1. Fetch from real-time full-stack server API
+      const serverPrayers = await fetchServerPrayers();
+      if (Array.isArray(serverPrayers)) {
+        setPrayers(serverPrayers);
+        saveStoredPrayers(serverPrayers);
+      } else {
+        setPrayers(getStoredPrayers());
+      }
 
       // 2. If Supabase is connected, fetch live prayers
       const supabase = getSupabaseClient();
@@ -37,7 +43,7 @@ export const PrayerWallSection: React.FC = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             const mapped: PrayerItem[] = data.map((d: any) => ({
               id: d.id,
               author: d.author,
@@ -59,10 +65,13 @@ export const PrayerWallSection: React.FC = () => {
 
     loadPrayers();
 
+    // Poll server API every 4s for cross-device real-time sync
+    const interval = setInterval(loadPrayers, 4000);
+
     // Listen for updates from Admin page or another tab
     const handleDataUpdate = (e: any) => {
       if (!e.detail || e.detail.type === 'prayers') {
-        setPrayers(getStoredPrayers());
+        loadPrayers();
       }
     };
 
@@ -75,6 +84,7 @@ export const PrayerWallSection: React.FC = () => {
     window.addEventListener('espoir_data_updated', handleDataUpdate);
     window.addEventListener('storage', handleStorageChange);
     return () => {
+      clearInterval(interval);
       window.removeEventListener('espoir_data_updated', handleDataUpdate);
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -132,6 +142,9 @@ export const PrayerWallSection: React.FC = () => {
     saveStoredPrayers(updated);
     setCurrentPage(1);
     setSubmittedMessage(true);
+
+    // Sync to Server API for cross-device visibility
+    await saveServerPrayers(newPrayer);
 
     // Sync to Supabase
     const supabase = getSupabaseClient();
