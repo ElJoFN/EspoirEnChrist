@@ -23,7 +23,7 @@ export const EventsSection: React.FC = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && data && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped: MinistryEvent[] = data.map((d: any) => ({
               id: d.id,
               title: d.title,

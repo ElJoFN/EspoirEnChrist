@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds } from '../data/prayers';
+import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds, mergePrayers } from '../data/prayers';
 import { getSupabaseClient } from '../services/supabase';
 import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -25,7 +25,8 @@ export const PrayerWallSection: React.FC = () => {
   useEffect(() => {
     const loadPrayers = async () => {
       // 1. Immediately sync with local storage
-      setPrayers(getStoredPrayers());
+      const local = getStoredPrayers();
+      setPrayers(local);
 
       // 2. If Supabase is connected, fetch live prayers
       const supabase = getSupabaseClient();
@@ -36,7 +37,7 @@ export const PrayerWallSection: React.FC = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && data && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped: PrayerItem[] = data.map((d: any) => ({
               id: d.id,
               author: d.author,
@@ -47,8 +48,10 @@ export const PrayerWallSection: React.FC = () => {
               prayersCount: d.prayers_count || 1,
               isUrgent: Boolean(d.is_urgent),
             }));
-            setPrayers(mapped);
-            saveStoredPrayers(mapped);
+            const currentLocal = getStoredPrayers();
+            const merged = mergePrayers(mapped, currentLocal);
+            setPrayers(merged);
+            saveStoredPrayers(merged);
           }
         } catch (e) {
           console.warn('Supabase fetch prayers error:', e);

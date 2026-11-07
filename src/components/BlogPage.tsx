@@ -43,7 +43,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!error && data && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped: BlogPost[] = data.map((d: any) => ({
               id: d.id,
               title: d.title,

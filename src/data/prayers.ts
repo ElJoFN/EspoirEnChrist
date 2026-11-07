@@ -126,3 +126,16 @@ export const saveStoredPrayedIds = (ids: Record<string, boolean>): void => {
     console.error('Error saving prayed ids:', e);
   }
 };
+
+export const mergePrayers = (remotePrayers: PrayerItem[], localPrayers: PrayerItem[]): PrayerItem[] => {
+  const map = new Map<string, PrayerItem>();
+  for (const p of remotePrayers) {
+    if (p && p.id) map.set(p.id, p);
+  }
+  for (const p of localPrayers) {
+    if (p && p.id && !map.has(p.id)) {
+      map.set(p.id, p);
+    }
+  }
+  return Array.from(map.values());
+};
