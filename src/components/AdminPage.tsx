@@ -312,7 +312,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
         localStorage.setItem('espoir_admin_auth', 'true');
       }
     } else {
-      setLoginError('Code d\'accès incorrect. Cliquez sur le bouton "Insérer" ci-dessous.');
+      setLoginError('Code d\'accès incorrect. Veuillez vérifier votre clé de sécurité administrateur.');
     }
   };
 
@@ -837,7 +837,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                     setPasswordInput(e.target.value);
                     if (loginError) setLoginError('');
                   }}
-                  placeholder="Ex: Espoir2026"
+                  placeholder="Entrez votre mot de passe..."
                   className="w-full pl-3.5 pr-10 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-mono"
                   autoFocus
                 />
@@ -848,24 +848,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                   aria-label={showPassword ? 'Masquer' : 'Afficher'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Quick Fill Helper */}
-              <div className="mt-2.5 p-2.5 bg-slate-900/80 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-1.5 text-slate-300 overflow-hidden">
-                  <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="truncate">Code : <code className="text-amber-400 font-mono font-bold select-all">EspoirEnChrist2026#@++</code></span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPasswordInput('EspoirEnChrist2026#@++');
-                    if (loginError) setLoginError('');
-                  }}
-                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg transition-all active:scale-95 shrink-0"
-                >
-                  Insérer
                 </button>
               </div>
             </div>
