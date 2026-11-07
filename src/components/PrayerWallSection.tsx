@@ -48,10 +48,8 @@ export const PrayerWallSection: React.FC = () => {
               prayersCount: d.prayers_count || 1,
               isUrgent: Boolean(d.is_urgent),
             }));
-            const currentLocal = getStoredPrayers();
-            const merged = mergePrayers(mapped, currentLocal);
-            setPrayers(merged);
-            saveStoredPrayers(merged);
+            setPrayers(mapped);
+            saveStoredPrayers(mapped);
           }
         } catch (e) {
           console.warn('Supabase fetch prayers error:', e);

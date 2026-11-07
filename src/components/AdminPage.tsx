@@ -224,7 +224,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             .from('events')
             .select('*')
             .order('created_at', { ascending: false });
-          if (Array.isArray(evts) && evts.length > 0) {
+          if (Array.isArray(evts)) {
             const mapped = evts.map((d: any) => ({
               id: d.id,
               title: d.title,
@@ -255,17 +255,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
               prayersCount: d.prayers_count || 1,
               isUrgent: Boolean(d.is_urgent),
             }));
-            const localPr = getStoredPrayers();
-            const mergedPr = mergePrayers(mappedPr, localPr);
-            setPrayers(mergedPr);
-            saveStoredPrayers(mergedPr);
+            setPrayers(mappedPr);
+            saveStoredPrayers(mappedPr);
           }
 
           const { data: bps } = await client
             .from('blog_posts')
             .select('*')
             .order('created_at', { ascending: false });
-          if (Array.isArray(bps) && bps.length > 0) {
+          if (Array.isArray(bps)) {
             const mappedBp = bps.map((d: any) => ({
               id: d.id,
               title: d.title,
@@ -281,6 +279,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             }));
             setBlogPosts(mappedBp);
             saveStoredBlogPosts(mappedBp);
+          }
+
+          const { data: msgs } = await client
+            .from('contact_messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (Array.isArray(msgs)) {
+            const mappedMsg = msgs.map((d: any) => ({
+              id: d.id,
+              name: d.name,
+              email: d.email,
+              phone: d.phone || undefined,
+              requestType: d.request_type,
+              subject: d.subject || undefined,
+              message: d.message,
+              requestCallback: Boolean(d.request_callback),
+              date: d.date,
+              status: d.status || 'nouveau',
+            }));
+            setContactMessages(mappedMsg);
+            saveStoredContactMessages(mappedMsg);
           }
         } catch (err) {
           console.warn('Initial Supabase fetch in Admin:', err);
