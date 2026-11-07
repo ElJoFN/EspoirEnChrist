@@ -1,0 +1,6 @@
+{
+  "name": "Espoir en Christ",
+  "description": "Plateforme chrétienne d'espérance, verset du jour, prières, communauté et accompagnement spirituel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
