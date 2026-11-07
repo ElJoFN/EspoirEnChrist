@@ -61,7 +61,10 @@ export const DEFAULT_EVENTS: MinistryEvent[] = [
 export const getStoredEvents = (): MinistryEvent[] => {
   try {
     const saved = localStorage.getItem('espoir_dynamic_events');
-    return saved ? JSON.parse(saved) : DEFAULT_EVENTS;
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    return DEFAULT_EVENTS;
   } catch (e) {
     return DEFAULT_EVENTS;
   }
@@ -70,6 +73,9 @@ export const getStoredEvents = (): MinistryEvent[] => {
 export const saveStoredEvents = (events: MinistryEvent[]): void => {
   try {
     localStorage.setItem('espoir_dynamic_events', JSON.stringify(events));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'events' } }));
+    }
   } catch (e) {
     console.error('Error saving dynamic events:', e);
   }

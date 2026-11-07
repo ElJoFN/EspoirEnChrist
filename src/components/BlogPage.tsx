@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { BlogPost, getStoredBlogPosts, saveStoredBlogPosts, DEFAULT_BLOG_POSTS } from '../data/blogPosts';
-import { Newspaper, Sparkles, BookOpen, Heart, ArrowLeft, Send, Check, Search, Filter, Plus, Trash2, RefreshCw, Layers, Clock, User, X, Share2, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BlogPost, getStoredBlogPosts, saveStoredBlogPosts } from '../data/blogPosts';
+import { getSupabaseClient } from '../services/supabase';
+import { BookOpen, Heart, ArrowLeft, Send, Check, Search, Filter, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BlogPageProps {
   onBackToHome: () => void;
@@ -23,24 +24,70 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
     }
   });
 
-  // Admin testing drawer state
-  const [showAdminAdd, setShowAdminAdd] = useState<boolean>(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState<BlogPost['category']>('Méditation');
-  const [newAuthor, setNewAuthor] = useState('');
-  const [newBiblicalRef, setNewBiblicalRef] = useState('');
-  const [newReadTime, setNewReadTime] = useState('5 min');
-  const [newSnippet, setNewSnippet] = useState('');
-  const [newContent, setNewContent] = useState('');
-
   // Newsletter state
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
-  // Sync with local storage
+  // Load and sync blog posts with Supabase and localStorage
   useEffect(() => {
-    saveStoredBlogPosts(posts);
-  }, [posts]);
+    const loadBlogPosts = async () => {
+      // 1. Immediately sync with local storage
+      setPosts(getStoredBlogPosts());
+
+      // 2. If Supabase is connected, fetch live posts
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('blog_posts')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && data && data.length > 0) {
+            const mapped: BlogPost[] = data.map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              category: d.category,
+              author: d.author,
+              date: d.date,
+              readTime: d.read_time,
+              snippet: d.snippet,
+              content: d.content,
+              biblicalReference: d.biblical_reference || undefined,
+              likesCount: d.likes_count || 1,
+              featured: Boolean(d.featured),
+            }));
+            setPosts(mapped);
+            saveStoredBlogPosts(mapped);
+          }
+        } catch (e) {
+          console.warn('Supabase fetch blog posts error:', e);
+        }
+      }
+    };
+
+    loadBlogPosts();
+
+    // Listen for updates from Admin page or another tab
+    const handleDataUpdate = (e: any) => {
+      if (!e.detail || e.detail.type === 'blog') {
+        setPosts(getStoredBlogPosts());
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'espoir_dynamic_blog_posts') {
+        setPosts(getStoredBlogPosts());
+      }
+    };
+
+    window.addEventListener('espoir_data_updated', handleDataUpdate);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('espoir_data_updated', handleDataUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -48,70 +95,29 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
     } catch (e) {}
   }, [likedPosts]);
 
-  // Reactive listener for future Admin page updates or multi-tab sync
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'espoir_dynamic_blog_posts') {
-        setPosts(getStoredBlogPosts());
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  const handleLikeClick = (id: string) => {
+  const handleLikeClick = async (id: string) => {
     if (likedPosts[id]) return;
 
+    const targetPost = posts.find((p) => p.id === id);
+    const newCount = targetPost ? targetPost.likesCount + 1 : 1;
+
     const updated = posts.map((p) =>
-      p.id === id ? { ...p, likesCount: p.likesCount + 1 } : p
+      p.id === id ? { ...p, likesCount: newCount } : p
     );
     setPosts(updated);
     saveStoredBlogPosts(updated);
     setLikedPosts((prev) => ({ ...prev, [id]: true }));
-  };
 
-  const handleAdminCreatePost = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newSnippet.trim()) return;
-
-    const created: BlogPost = {
-      id: `post-${Date.now()}`,
-      title: newTitle.trim(),
-      category: newCategory,
-      author: newAuthor.trim() || 'Équipe Espoir en Christ',
-      date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
-      readTime: newReadTime.trim() || '5 min',
-      biblicalReference: newBiblicalRef.trim() || undefined,
-      snippet: newSnippet.trim(),
-      content: newContent.trim() || newSnippet.trim(),
-      likesCount: 1,
-      featured: false,
-    };
-
-    const updated = [created, ...posts];
-    setPosts(updated);
-    saveStoredBlogPosts(updated);
-    setCurrentPage(1);
-
-    // Reset admin form
-    setNewTitle('');
-    setNewAuthor('');
-    setNewBiblicalRef('');
-    setNewSnippet('');
-    setNewContent('');
-    setShowAdminAdd(false);
-  };
-
-  const handleDeletePost = (id: string) => {
-    const updated = posts.filter((p) => p.id !== id);
-    setPosts(updated);
-    saveStoredBlogPosts(updated);
-  };
-
-  const handleResetPosts = () => {
-    setPosts(DEFAULT_BLOG_POSTS);
-    saveStoredBlogPosts(DEFAULT_BLOG_POSTS);
-    setCurrentPage(1);
+    // Sync to Supabase in background
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase
+          .from('blog_posts')
+          .update({ likes_count: newCount })
+          .eq('id', id);
+      } catch (err) {}
+    }
   };
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
@@ -135,7 +141,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
     return matchesCategory && matchesSearch;
   });
 
-  // Pagination logic: max 6 articles per page; if filtered posts exceed 6, show pagination
+  // Pagination logic: max 6 articles per page
   const totalPosts = filteredPosts.length;
   const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE) || 1;
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -151,7 +157,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
     <div className="py-12 sm:py-16 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-[85vh] transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Top Back Navigation */}
+        {/* Top Back Navigation (Clean) */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <button
             onClick={onBackToHome}
@@ -160,39 +166,13 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
             <ArrowLeft className="w-4 h-4" />
             <span>Retour à l'Accueil</span>
           </button>
-
-          {/* Admin Testing Controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAdminAdd(!showAdminAdd)}
-              className="px-3.5 py-2 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-850 text-amber-700 dark:text-amber-400 border border-amber-400/50 dark:border-amber-500/40 text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 active:scale-95"
-              title="Tester la rédaction d'un article pour l'admin"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{showAdminAdd ? 'Fermer le testeur' : '+ Rédiger Article (Admin)'}</span>
-            </button>
-            <button
-              onClick={handleResetPosts}
-              className="p-2 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800 rounded-xl transition-colors shadow-xs"
-              title="Réinitialiser les articles par défaut"
-              aria-label="Réinitialiser les articles"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
         </div>
 
         {/* Hero Header */}
         <div className="bg-gradient-to-br from-amber-50 via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/40 border border-amber-300 dark:border-amber-500/30 rounded-3xl p-6 sm:p-10 shadow-md dark:shadow-xl relative overflow-hidden mb-12 transition-colors">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
-              Blog & Partages
-            </span>
-            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-950 px-2.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 flex items-center gap-1 shadow-2xs">
-              <Layers className="w-3 h-3 text-amber-500" />
-              Dynamique & Prêt pour Base de Données
-            </span>
-          </div>
+          <span className="text-xs font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30 inline-block mb-3">
+            Blog & Partages
+          </span>
 
           <h1 className="text-3xl sm:text-5xl font-serif font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
             Enseignements, Méditations & Témoignages
@@ -206,113 +186,6 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
             Découvrez nos articles spirituels inspirants pour nourrir votre foi, méditer la sainte Écriture et entendre comment le Seigneur agit concrètement dans nos vies.
           </p>
         </div>
-
-        {/* Dynamic Admin Article Creator Drawer */}
-        {showAdminAdd && (
-          <div className="mb-10 p-5 sm:p-6 bg-white dark:bg-slate-950 border border-amber-400 dark:border-amber-500/40 rounded-2xl shadow-xl space-y-4 transition-colors">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4" />
-                MODULE D'ÉDITION D'ARTICLE (PRÉPARÉ POUR VOTRE FUTUR PANEL ADMIN)
-              </span>
-              <span className="text-[11px] text-slate-500">Stockage dynamique immédiat</span>
-            </div>
-
-            <form onSubmit={handleAdminCreatePost} className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div className="sm:col-span-2">
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Titre de l'Article</label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ex: La puissance du pardon selon l'Évangile"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Catégorie</label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                >
-                  <option value="Méditation">Méditation</option>
-                  <option value="Enseignement">Enseignement</option>
-                  <option value="Témoignage">Témoignage</option>
-                  <option value="Vie Chrétienne">Vie Chrétienne</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Auteur</label>
-                <input
-                  type="text"
-                  value={newAuthor}
-                  onChange={(e) => setNewAuthor(e.target.value)}
-                  placeholder="Ex: Pasteur David"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Passage Biblique Clé</label>
-                <input
-                  type="text"
-                  value={newBiblicalRef}
-                  onChange={(e) => setNewBiblicalRef(e.target.value)}
-                  placeholder="Ex: Éphésiens 4:32"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Temps de lecture</label>
-                <input
-                  type="text"
-                  value={newReadTime}
-                  onChange={(e) => setNewReadTime(e.target.value)}
-                  placeholder="Ex: 5 min"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="sm:col-span-3">
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Résumé d'introduction</label>
-                <textarea
-                  required
-                  rows={2}
-                  value={newSnippet}
-                  onChange={(e) => setNewSnippet(e.target.value)}
-                  placeholder="Une courte introduction pour attirer l'attention du lecteur..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white resize-none"
-                />
-              </div>
-
-              <div className="sm:col-span-3">
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Contenu complet de l'article</label>
-                <textarea
-                  rows={5}
-                  value={newContent}
-                  onChange={(e) => setNewContent(e.target.value)}
-                  placeholder="Développez l'enseignement biblique ou le témoignage complet..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white resize-none font-sans"
-                />
-              </div>
-
-              <div className="sm:col-span-3 pt-1">
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-xs flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Publier l'article dynamiquement</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
 
         {/* Search & Category Filter Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -358,7 +231,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
 
         </div>
 
-        {/* Articles Grid */}
+        {/* Articles Grid (Clean Visitor Interface) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           {paginatedPosts.map((post) => {
             const hasLiked = likedPosts[post.id];
@@ -378,15 +251,6 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
                         <Clock className="w-3 h-3" />
                         {post.readTime}
                       </span>
-                      {/* Admin delete trigger */}
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="p-1 text-slate-400 hover:text-red-500 transition-colors ml-1"
-                        title="Supprimer cet article (Action Admin)"
-                        aria-label="Supprimer cet article"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   </div>
 
@@ -462,7 +326,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
           </div>
         )}
 
-        {/* Pagination Controls when articles exceed 6 (6 articles max par page) */}
+        {/* Pagination Controls when articles exceed 6 */}
         {totalPosts > POSTS_PER_PAGE && (
           <div className="mt-4 mb-16 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">

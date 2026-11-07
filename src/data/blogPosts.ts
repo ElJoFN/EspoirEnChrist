@@ -169,7 +169,10 @@ Dieu a touché son cœur au même instant. Les larmes ont effacé dix années de
 export const getStoredBlogPosts = (): BlogPost[] => {
   try {
     const saved = localStorage.getItem('espoir_dynamic_blog_posts');
-    return saved ? JSON.parse(saved) : DEFAULT_BLOG_POSTS;
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    return DEFAULT_BLOG_POSTS;
   } catch (e) {
     return DEFAULT_BLOG_POSTS;
   }
@@ -178,6 +181,9 @@ export const getStoredBlogPosts = (): BlogPost[] => {
 export const saveStoredBlogPosts = (posts: BlogPost[]): void => {
   try {
     localStorage.setItem('espoir_dynamic_blog_posts', JSON.stringify(posts));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'blog' } }));
+    }
   } catch (e) {
     console.error('Error saving dynamic blog posts:', e);
   }

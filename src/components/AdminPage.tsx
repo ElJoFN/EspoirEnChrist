@@ -176,10 +176,82 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     saveStoredContactMessages(contactMessages);
   }, [contactMessages]);
 
-  // Initial Supabase test on mount
+  // Initial Supabase test & data sync on mount
   useEffect(() => {
     if (isSupabaseConfigured()) {
       handleTestSupabase();
+
+      // Fetch live data from Supabase if tables exist
+      const fetchFromSupabase = async () => {
+        const client = getSupabaseClient();
+        if (!client) return;
+        try {
+          const { data: evts } = await client
+            .from('events')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (evts && evts.length > 0) {
+            const mapped = evts.map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              category: d.category,
+              dateStr: d.date_str,
+              timeStr: d.time_str,
+              location: d.location,
+              description: d.description,
+              isOnlineAvailable: Boolean(d.is_online_available),
+              speaker: d.speaker || undefined,
+            }));
+            setEvents(mapped);
+            saveStoredEvents(mapped);
+          }
+
+          const { data: prs } = await client
+            .from('prayers')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (prs && prs.length > 0) {
+            const mappedPr = prs.map((d: any) => ({
+              id: d.id,
+              author: d.author,
+              location: d.location || undefined,
+              category: d.category,
+              request: d.request,
+              date: d.date,
+              prayersCount: d.prayers_count || 1,
+              isUrgent: Boolean(d.is_urgent),
+            }));
+            setPrayers(mappedPr);
+            saveStoredPrayers(mappedPr);
+          }
+
+          const { data: bps } = await client
+            .from('blog_posts')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (bps && bps.length > 0) {
+            const mappedBp = bps.map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              category: d.category,
+              author: d.author,
+              date: d.date,
+              readTime: d.read_time,
+              snippet: d.snippet,
+              content: d.content,
+              biblicalReference: d.biblical_reference || undefined,
+              likesCount: d.likes_count || 1,
+              featured: Boolean(d.featured),
+            }));
+            setBlogPosts(mappedBp);
+            saveStoredBlogPosts(mappedBp);
+          }
+        } catch (err) {
+          console.warn('Initial Supabase fetch in Admin:', err);
+        }
+      };
+
+      fetchFromSupabase();
     }
   }, []);
 
@@ -353,8 +425,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     e.preventDefault();
     if (!eventTitle.trim()) return;
 
+    let updatedList: MinistryEvent[];
+    const targetId = editingEvent ? editingEvent.id : `evt-${Date.now()}`;
     if (editingEvent) {
-      const updated = events.map((ev) =>
+      updatedList = events.map((ev) =>
         ev.id === editingEvent.id
           ? {
               ...ev,
@@ -369,10 +443,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             }
           : ev
       );
-      setEvents(updated);
     } else {
       const newEvt: MinistryEvent = {
-        id: `evt-${Date.now()}`,
+        id: targetId,
         title: eventTitle.trim(),
         category: eventCategory,
         dateStr: eventDateStr.trim(),
@@ -382,15 +455,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
         description: eventDescription.trim(),
         isOnlineAvailable: eventIsOnline,
       };
-      setEvents([newEvt, ...events]);
+      updatedList = [newEvt, ...events];
     }
+    setEvents(updatedList);
+    saveStoredEvents(updatedList);
 
     // Try Supabase sync in background
     const client = getSupabaseClient();
     if (client) {
       try {
         await client.from('events').upsert({
-          id: editingEvent ? editingEvent.id : `evt-${Date.now()}`,
+          id: targetId,
           title: eventTitle.trim(),
           category: eventCategory,
           date_str: eventDateStr.trim(),
@@ -408,7 +483,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
   const handleDeleteEvent = async (id: string) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet événement ?')) return;
-    setEvents(events.filter((e) => e.id !== id));
+    const remaining = events.filter((e) => e.id !== id);
+    setEvents(remaining);
+    saveStoredEvents(remaining);
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -442,8 +519,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     e.preventDefault();
     if (!prayerRequest.trim()) return;
 
+    let updatedPrayers: PrayerItem[];
+    const prayerTargetId = editingPrayer ? editingPrayer.id : `p-${Date.now()}`;
     if (editingPrayer) {
-      const updated = prayers.map((p) =>
+      updatedPrayers = prayers.map((p) =>
         p.id === editingPrayer.id
           ? {
               ...p,
@@ -455,10 +534,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
             }
           : p
       );
-      setPrayers(updated);
     } else {
       const newP: PrayerItem = {
-        id: `p-${Date.now()}`,
+        id: prayerTargetId,
         author: prayerAuthor.trim() || 'Visiteur Espoir',
         location: prayerLocation.trim() || undefined,
         category: prayerCategory,
@@ -467,7 +545,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
         prayersCount: 1,
         isUrgent: prayerIsUrgent,
       };
-      setPrayers([newP, ...prayers]);
+      updatedPrayers = [newP, ...prayers];
+    }
+    setPrayers(updatedPrayers);
+    saveStoredPrayers(updatedPrayers);
+
+    // Try Supabase sync
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('prayers').upsert({
+          id: prayerTargetId,
+          author: prayerAuthor.trim() || 'Visiteur Espoir',
+          location: prayerLocation.trim() || null,
+          category: prayerCategory,
+          request: prayerRequest.trim(),
+          date: editingPrayer ? editingPrayer.date : "Aujourd'hui",
+          prayers_count: editingPrayer ? editingPrayer.prayersCount : 1,
+          is_urgent: prayerIsUrgent,
+          is_approved: true,
+        });
+      } catch (err) {}
     }
 
     setIsPrayerModalOpen(false);
@@ -475,7 +573,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
   const handleDeletePrayer = async (id: string) => {
     if (!window.confirm('Supprimer cette intention de prière ?')) return;
-    setPrayers(prayers.filter((p) => p.id !== id));
+    const remaining = prayers.filter((p) => p.id !== id);
+    setPrayers(remaining);
+    saveStoredPrayers(remaining);
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -485,15 +585,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
   };
 
   const handleToggleUrgentPrayer = (id: string) => {
-    setPrayers(
-      prayers.map((p) => (p.id === id ? { ...p, isUrgent: !p.isUrgent } : p))
-    );
+    const updated = prayers.map((p) => (p.id === id ? { ...p, isUrgent: !p.isUrgent } : p));
+    setPrayers(updated);
+    saveStoredPrayers(updated);
   };
 
   const handleIncrementPrayerCount = (id: string) => {
-    setPrayers(
-      prayers.map((p) => (p.id === id ? { ...p, prayersCount: p.prayersCount + 1 } : p))
-    );
+    const updated = prayers.map((p) => (p.id === id ? { ...p, prayersCount: p.prayersCount + 1 } : p));
+    setPrayers(updated);
+    saveStoredPrayers(updated);
   };
 
   // Blog modal handlers
@@ -525,41 +625,69 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
     e.preventDefault();
     if (!postTitle.trim() || !postSnippet.trim()) return;
 
+    let updatedPosts: BlogPost[];
+    const blogTargetId = editingPost ? editingPost.id : `post-${Date.now()}`;
+    const readTimeVal = postReadTime.trim() || '5 min';
+    const authorVal = postAuthor.trim() || 'Équipe Espoir en Christ';
+    const bibRefVal = postBiblicalRef.trim() || undefined;
+    const contentVal = postContent.trim() || postSnippet.trim();
+
     if (editingPost) {
-      const updated = blogPosts.map((p) =>
+      updatedPosts = blogPosts.map((p) =>
         p.id === editingPost.id
           ? {
               ...p,
               title: postTitle.trim(),
               category: postCategory,
-              author: postAuthor.trim() || 'Équipe Espoir en Christ',
-              biblicalReference: postBiblicalRef.trim() || undefined,
-              readTime: postReadTime.trim() || '5 min',
+              author: authorVal,
+              biblicalReference: bibRefVal,
+              readTime: readTimeVal,
               snippet: postSnippet.trim(),
-              content: postContent.trim() || postSnippet.trim(),
+              content: contentVal,
             }
           : p
       );
-      setBlogPosts(updated);
     } else {
       const newPost: BlogPost = {
-        id: `post-${Date.now()}`,
+        id: blogTargetId,
         title: postTitle.trim(),
         category: postCategory,
-        author: postAuthor.trim() || 'Équipe Espoir en Christ',
+        author: authorVal,
         date: new Date().toLocaleDateString('fr-FR', {
           day: 'numeric',
           month: 'long',
           year: 'numeric',
         }),
-        biblicalReference: postBiblicalRef.trim() || undefined,
-        readTime: postReadTime.trim() || '5 min',
+        biblicalReference: bibRefVal,
+        readTime: readTimeVal,
         snippet: postSnippet.trim(),
-        content: postContent.trim() || postSnippet.trim(),
+        content: contentVal,
         likesCount: 1,
         featured: false,
       };
-      setBlogPosts([newPost, ...blogPosts]);
+      updatedPosts = [newPost, ...blogPosts];
+    }
+    setBlogPosts(updatedPosts);
+    saveStoredBlogPosts(updatedPosts);
+
+    // Supabase sync
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('blog_posts').upsert({
+          id: blogTargetId,
+          title: postTitle.trim(),
+          category: postCategory,
+          author: authorVal,
+          date: editingPost ? editingPost.date : new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+          biblical_reference: bibRefVal || null,
+          read_time: readTimeVal,
+          snippet: postSnippet.trim(),
+          content: contentVal,
+          likes_count: editingPost ? editingPost.likesCount : 1,
+          featured: editingPost ? Boolean(editingPost.featured) : false,
+        });
+      } catch (err) {}
     }
 
     setIsBlogModalOpen(false);
@@ -567,7 +695,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
 
   const handleDeletePost = async (id: string) => {
     if (!window.confirm('Supprimer cet article de blog ?')) return;
-    setBlogPosts(blogPosts.filter((p) => p.id !== id));
+    const remaining = blogPosts.filter((p) => p.id !== id);
+    setBlogPosts(remaining);
+    saveStoredBlogPosts(remaining);
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -1082,6 +1212,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                   onClick={() => {
                     if (window.confirm('Réinitialiser les événements aux valeurs par défaut ?')) {
                       setEvents(DEFAULT_EVENTS);
+                      saveStoredEvents(DEFAULT_EVENTS);
                     }
                   }}
                   className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-colors"
@@ -1194,6 +1325,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                   onClick={() => {
                     if (window.confirm('Réinitialiser les prières par défaut ?')) {
                       setPrayers(DEFAULT_PRAYERS);
+                      saveStoredPrayers(DEFAULT_PRAYERS);
                     }
                   }}
                   className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-colors"
@@ -1322,6 +1454,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBackToSite }) => {
                   onClick={() => {
                     if (window.confirm('Réinitialiser les articles par défaut ?')) {
                       setBlogPosts(DEFAULT_BLOG_POSTS);
+                      saveStoredBlogPosts(DEFAULT_BLOG_POSTS);
                     }
                   }}
                   className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-colors"

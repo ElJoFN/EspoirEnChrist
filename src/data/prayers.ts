@@ -90,7 +90,10 @@ export const DEFAULT_PRAYERS = INITIAL_PRAYERS;
 export const getStoredPrayers = (): PrayerItem[] => {
   try {
     const saved = localStorage.getItem('espoir_dynamic_prayers');
-    return saved ? JSON.parse(saved) : DEFAULT_PRAYERS;
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+    return DEFAULT_PRAYERS;
   } catch (e) {
     return DEFAULT_PRAYERS;
   }
@@ -99,6 +102,9 @@ export const getStoredPrayers = (): PrayerItem[] => {
 export const saveStoredPrayers = (prayers: PrayerItem[]): void => {
   try {
     localStorage.setItem('espoir_dynamic_prayers', JSON.stringify(prayers));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('espoir_data_updated', { detail: { type: 'prayers' } }));
+    }
   } catch (e) {
     console.error('Error saving dynamic prayers:', e);
   }

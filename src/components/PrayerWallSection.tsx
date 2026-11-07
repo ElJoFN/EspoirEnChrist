@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds, DEFAULT_PRAYERS } from '../data/prayers';
-import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, Trash2, RefreshCw, Layers, Sparkles, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds } from '../data/prayers';
+import { getSupabaseClient } from '../services/supabase';
+import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PRAYERS_PER_PAGE = 6;
 
@@ -11,14 +12,6 @@ export const PrayerWallSection: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [showFormModal, setShowFormModal] = useState<boolean>(false);
 
-  // Admin dynamic test drawer toggle (like in EventsSection)
-  const [showAdminQuickAdd, setShowAdminQuickAdd] = useState<boolean>(false);
-  const [adminAuthor, setAdminAuthor] = useState('');
-  const [adminCategory, setAdminCategory] = useState<PrayerItem['category']>('Santé');
-  const [adminRequest, setAdminRequest] = useState('');
-  const [adminLocation, setAdminLocation] = useState('');
-  const [adminIsUrgent, setAdminIsUrgent] = useState(false);
-
   // Visitor form states
   const [authorName, setAuthorName] = useState('');
   const [location, setLocation] = useState('');
@@ -28,31 +21,76 @@ export const PrayerWallSection: React.FC = () => {
   const [isUrgent, setIsUrgent] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState(false);
 
-  // Sync state with local storage
+  // Load prayers and sync with Supabase & local storage
   useEffect(() => {
-    saveStoredPrayers(prayers);
-  }, [prayers]);
+    const loadPrayers = async () => {
+      // 1. Immediately sync with local storage
+      setPrayers(getStoredPrayers());
 
-  useEffect(() => {
-    saveStoredPrayedIds(prayedIds);
-  }, [prayedIds]);
+      // 2. If Supabase is connected, fetch live prayers
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('prayers')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-  // Reactive listener for future Admin page updates or multi-tab sync
-  useEffect(() => {
+          if (!error && data && data.length > 0) {
+            const mapped: PrayerItem[] = data.map((d: any) => ({
+              id: d.id,
+              author: d.author,
+              location: d.location || undefined,
+              category: d.category,
+              request: d.request,
+              date: d.date,
+              prayersCount: d.prayers_count || 1,
+              isUrgent: Boolean(d.is_urgent),
+            }));
+            setPrayers(mapped);
+            saveStoredPrayers(mapped);
+          }
+        } catch (e) {
+          console.warn('Supabase fetch prayers error:', e);
+        }
+      }
+    };
+
+    loadPrayers();
+
+    // Listen for updates from Admin page or another tab
+    const handleDataUpdate = (e: any) => {
+      if (!e.detail || e.detail.type === 'prayers') {
+        setPrayers(getStoredPrayers());
+      }
+    };
+
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'espoir_dynamic_prayers') {
         setPrayers(getStoredPrayers());
       }
     };
+
+    window.addEventListener('espoir_data_updated', handleDataUpdate);
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('espoir_data_updated', handleDataUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
-  const handlePrayClick = (id: string) => {
+  useEffect(() => {
+    saveStoredPrayedIds(prayedIds);
+  }, [prayedIds]);
+
+  const handlePrayClick = async (id: string) => {
     if (prayedIds[id]) return;
 
+    const targetPrayer = prayers.find((item) => item.id === id);
+    const newCount = targetPrayer ? targetPrayer.prayersCount + 1 : 1;
+
     const updated = prayers.map((item) =>
-      item.id === id ? { ...item, prayersCount: item.prayersCount + 1 } : item
+      item.id === id ? { ...item, prayersCount: newCount } : item
     );
     setPrayers(updated);
     saveStoredPrayers(updated);
@@ -60,9 +98,20 @@ export const PrayerWallSection: React.FC = () => {
     const updatedPrayedIds = { ...prayedIds, [id]: true };
     setPrayedIds(updatedPrayedIds);
     saveStoredPrayedIds(updatedPrayedIds);
+
+    // Sync to Supabase in background
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase
+          .from('prayers')
+          .update({ prayers_count: newCount })
+          .eq('id', id);
+      } catch (err) {}
+    }
   };
 
-  const handleAddPrayerSubmit = (e: React.FormEvent) => {
+  const handleAddPrayerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!requestText.trim()) return;
 
@@ -83,6 +132,28 @@ export const PrayerWallSection: React.FC = () => {
     setCurrentPage(1);
     setSubmittedMessage(true);
 
+    // Sync to Supabase
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase.from('prayers').insert([
+          {
+            id: newPrayer.id,
+            author: newPrayer.author,
+            location: newPrayer.location || null,
+            category: newPrayer.category,
+            request: newPrayer.request,
+            date: newPrayer.date,
+            prayers_count: 1,
+            is_urgent: newPrayer.isUrgent || false,
+            is_approved: true,
+          },
+        ]);
+      } catch (err) {
+        console.warn('Could not insert prayer into Supabase:', err);
+      }
+    }
+
     setTimeout(() => {
       setSubmittedMessage(false);
       setShowFormModal(false);
@@ -94,53 +165,13 @@ export const PrayerWallSection: React.FC = () => {
     }, 1800);
   };
 
-  const handleAdminCreatePrayer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminRequest.trim()) return;
-
-    const created: PrayerItem = {
-      id: `p-admin-${Date.now()}`,
-      author: adminAuthor.trim() || 'Modérateur Espoir',
-      location: adminLocation.trim() || undefined,
-      category: adminCategory,
-      request: adminRequest.trim(),
-      date: "À l'instant",
-      prayersCount: 1,
-      isUrgent: adminIsUrgent,
-    };
-
-    const updated = [created, ...prayers];
-    setPrayers(updated);
-    saveStoredPrayers(updated);
-    setCurrentPage(1);
-
-    // Reset admin form
-    setAdminAuthor('');
-    setAdminRequest('');
-    setAdminLocation('');
-    setAdminIsUrgent(false);
-    setShowAdminQuickAdd(false);
-  };
-
-  const handleDeletePrayer = (id: string) => {
-    const updated = prayers.filter((p) => p.id !== id);
-    setPrayers(updated);
-    saveStoredPrayers(updated);
-  };
-
-  const handleResetPrayers = () => {
-    setPrayers(DEFAULT_PRAYERS);
-    saveStoredPrayers(DEFAULT_PRAYERS);
-    setCurrentPage(1);
-  };
-
   const categories = ['Tous', 'Santé', 'Paix & Famille', 'Emploi & Projets', 'Foi & Orientation', 'Action de Grâce'];
 
   const filteredPrayers = selectedCategory === 'Tous'
     ? prayers
     : prayers.filter((p) => p.category === selectedCategory);
 
-  // Pagination logic: if prayers exceed 6, paginate max 6 per page
+  // Pagination logic: max 6 prayers per page
   const totalPrayers = filteredPrayers.length;
   const totalPages = Math.ceil(totalPrayers / PRAYERS_PER_PAGE) || 1;
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -159,19 +190,13 @@ export const PrayerWallSection: React.FC = () => {
     <section id="prieres" className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 transition-colors duration-200 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Header */}
+        {/* Clean Header without debug/tester elements */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 sm:mb-12 gap-5 sm:gap-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
-                Chaîne d'Intercession
-              </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-950 px-2.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 flex items-center gap-1 shadow-2xs">
-                <Layers className="w-3 h-3 text-amber-500" />
-                Dynamique & Prêt pour Base de Données
-              </span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-slate-900 dark:text-white mt-1 tracking-tight">
+            <span className="text-xs font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
+              Chaîne d'Intercession
+            </span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-slate-900 dark:text-white mt-2 tracking-tight">
               Le Mur de Prières
             </h2>
             <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed">
@@ -179,7 +204,7 @@ export const PrayerWallSection: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <div className="flex items-center gap-2 self-start md:self-auto">
             <button
               onClick={() => setShowFormModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 shrink-0 active:scale-95"
@@ -187,112 +212,8 @@ export const PrayerWallSection: React.FC = () => {
               <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Déposer une Prière</span>
             </button>
-
-            {/* Admin dynamic tester button (prepared for future admin page) */}
-            <button
-              onClick={() => setShowAdminQuickAdd(!showAdminQuickAdd)}
-              className="px-3.5 py-2.5 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-850 text-amber-700 dark:text-amber-400 border border-amber-400/50 dark:border-amber-500/40 text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 active:scale-95"
-              title="Tester l'ajout ou la gestion dynamique des prières"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{showAdminQuickAdd ? 'Fermer le testeur' : '+ Tester Prière (Admin)'}</span>
-            </button>
-
-            <button
-              onClick={handleResetPrayers}
-              className="p-2.5 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800 rounded-xl transition-colors shadow-xs"
-              title="Réinitialiser la liste d'origine"
-              aria-label="Réinitialiser la liste"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
           </div>
         </div>
-
-        {/* Dynamic Prayer Creator (Admin Tester Tool prepared for future admin dashboard) */}
-        {showAdminQuickAdd && (
-          <div className="mb-10 p-5 sm:p-6 bg-white dark:bg-slate-950 border border-amber-400 dark:border-amber-500/40 rounded-2xl shadow-xl space-y-4 transition-colors">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4" />
-                MODULE DE GESTION ADMINISTRATIVE (PRÉPARÉ POUR VOTRE FUTUR PANEL)
-              </span>
-              <span className="text-[11px] text-slate-500">Stockage dynamique en base locale</span>
-            </div>
-
-            <form onSubmit={handleAdminCreatePrayer} className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Auteur / Demandeur</label>
-                <input
-                  type="text"
-                  required
-                  value={adminAuthor}
-                  onChange={(e) => setAdminAuthor(e.target.value)}
-                  placeholder="Ex: David M."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Catégorie</label>
-                <select
-                  value={adminCategory}
-                  onChange={(e) => setAdminCategory(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                >
-                  <option value="Santé">Santé & Guérison</option>
-                  <option value="Paix & Famille">Paix & Famille</option>
-                  <option value="Emploi & Projets">Emploi & Projets</option>
-                  <option value="Foi & Orientation">Foi & Orientation</option>
-                  <option value="Action de Grâce">Action de Grâce</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Ville / Pays (Optionnel)</label>
-                <input
-                  type="text"
-                  value={adminLocation}
-                  onChange={(e) => setAdminLocation(e.target.value)}
-                  placeholder="Ex: Marseille, France"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="sm:col-span-3">
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Texte de l'intention de prière</label>
-                <textarea
-                  required
-                  rows={2}
-                  value={adminRequest}
-                  onChange={(e) => setAdminRequest(e.target.value)}
-                  placeholder="Ex: Merci de prier pour la paix dans notre famille..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white resize-none"
-                />
-              </div>
-
-              <div className="sm:col-span-3 flex items-center justify-between gap-4 pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-amber-700 dark:text-amber-400 font-semibold">
-                  <input
-                    type="checkbox"
-                    checked={adminIsUrgent}
-                    onChange={(e) => setAdminIsUrgent(e.target.checked)}
-                    className="rounded border-slate-300 dark:border-slate-800 text-amber-500 focus:ring-amber-500"
-                  />
-                  <span>Marquer comme intention urgente</span>
-                </label>
-
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-xs flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Ajouter la prière dynamiquement</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
 
         {/* Filter Categories */}
         <div className="flex items-center gap-2 mb-8 pb-4 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
@@ -337,18 +258,7 @@ export const PrayerWallSection: React.FC = () => {
                     <span className="text-[11px] font-bold text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-slate-900 border border-amber-200 dark:border-slate-800 px-2.5 py-0.5 rounded-md">
                       {item.category}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-500">{item.date}</span>
-                      {/* Delete trigger for testing dynamic admin removal */}
-                      <button
-                        onClick={() => handleDeletePrayer(item.id)}
-                        className="p-1 text-slate-400 hover:text-red-500 transition-colors ml-1"
-                        title="Supprimer cette prière (Action Admin)"
-                        aria-label="Supprimer cette prière"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <span className="text-[11px] text-slate-500">{item.date}</span>
                   </div>
 
                   {/* Urgent indicator */}
@@ -411,7 +321,7 @@ export const PrayerWallSection: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination Controls when requests exceed 6 (6 demandes max par page) */}
+        {/* Pagination Controls when requests exceed 6 */}
         {totalPrayers > PRAYERS_PER_PAGE && (
           <div className="mt-10 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
@@ -481,7 +391,7 @@ export const PrayerWallSection: React.FC = () => {
               Confiez votre intention
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 mb-6">
-              Votre demande sera immédiatement enregistrée et publiée sur le mur de prière de notre communauté.
+              Votre demande sera enregistrée et publiée sur le mur de prière de notre communauté.
             </p>
 
             {submittedMessage ? (
