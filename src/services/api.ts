@@ -2,159 +2,67 @@ import { MinistryEvent } from '../data/events';
 import { PrayerItem } from '../data/prayers';
 import { BlogPost } from '../data/blogPosts';
 import { ContactMessage } from '../data/contactMessages';
+import { syncManager, registerDataSyncListener, notifyDataUpdated } from './syncService';
 
-// ------------------------------------------------------------------
-// REALTIME CROSS-DEVICE BACKEND API SERVICE
-// ------------------------------------------------------------------
+// Re-export robust sync manager methods and listeners
+export { registerDataSyncListener, notifyDataUpdated, syncManager };
 
 // 1. EVENTS API
 export async function fetchServerEvents(): Promise<MinistryEvent[]> {
-  try {
-    const res = await fetch('/api/events');
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.fetchEvents();
 }
 
 export async function saveServerEvents(events: MinistryEvent[] | MinistryEvent): Promise<MinistryEvent[]> {
-  try {
-    const res = await fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(events),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.saveEvents(events);
 }
 
 export async function deleteServerEvent(id: string): Promise<MinistryEvent[]> {
-  try {
-    const res = await fetch(`/api/events/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  const current = await syncManager.fetchEvents();
+  const filtered = current.filter((e) => e.id !== id);
+  return await syncManager.saveEvents(filtered);
 }
 
 // 2. PRAYERS API
 export async function fetchServerPrayers(): Promise<PrayerItem[]> {
-  try {
-    const res = await fetch('/api/prayers');
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.fetchPrayers();
 }
 
 export async function saveServerPrayers(prayers: PrayerItem[] | PrayerItem): Promise<PrayerItem[]> {
-  try {
-    const res = await fetch('/api/prayers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prayers),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.savePrayers(prayers);
 }
 
 export async function deleteServerPrayer(id: string): Promise<PrayerItem[]> {
-  try {
-    const res = await fetch(`/api/prayers/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  const current = await syncManager.fetchPrayers();
+  const filtered = current.filter((p) => p.id !== id);
+  return await syncManager.savePrayers(filtered);
 }
 
 // 3. BLOG API
 export async function fetchServerBlogPosts(): Promise<BlogPost[]> {
-  try {
-    const res = await fetch('/api/blog');
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.fetchBlogPosts();
 }
 
 export async function saveServerBlogPosts(posts: BlogPost[] | BlogPost): Promise<BlogPost[]> {
-  try {
-    const res = await fetch('/api/blog', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(posts),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.saveBlogPosts(posts);
 }
 
 export async function deleteServerBlogPost(id: string): Promise<BlogPost[]> {
-  try {
-    const res = await fetch(`/api/blog/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  const current = await syncManager.fetchBlogPosts();
+  const filtered = current.filter((b) => b.id !== id);
+  return await syncManager.saveBlogPosts(filtered);
 }
 
 // 4. MESSAGES API
 export async function fetchServerMessages(): Promise<ContactMessage[]> {
-  try {
-    const res = await fetch('/api/messages');
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.fetchMessages();
 }
 
 export async function saveServerMessages(messages: ContactMessage[] | ContactMessage): Promise<ContactMessage[]> {
-  try {
-    const res = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(messages),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  return await syncManager.saveMessages(messages);
 }
 
 export async function deleteServerMessage(id: string): Promise<ContactMessage[]> {
-  try {
-    const res = await fetch(`/api/messages/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {}
-  return [];
+  const current = await syncManager.fetchMessages();
+  const filtered = current.filter((m) => m.id !== id);
+  return await syncManager.saveMessages(filtered);
 }

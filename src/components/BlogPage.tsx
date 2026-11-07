@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BlogPost, getStoredBlogPosts, saveStoredBlogPosts } from '../data/blogPosts';
 import { getSupabaseClient } from '../services/supabase';
-import { fetchServerBlogPosts } from '../services/api';
+import { fetchServerBlogPosts, registerDataSyncListener } from '../services/api';
 import { BookOpen, Heart, ArrowLeft, Send, Check, Search, Filter, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BlogPageProps {
@@ -83,20 +83,15 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBackToHome }) => {
 
     loadBlogPosts();
 
-    // Poll server API every 6s for cross-device real-time sync
-    const interval = setInterval(loadBlogPosts, 6000);
+    // Poll server API every 4s for instant cross-device real-time sync
+    const interval = setInterval(loadBlogPosts, 4000);
 
-    // Listen for updates from Admin page
-    const handleDataUpdate = (e: any) => {
-      if (!e.detail || e.detail.type === 'blog') {
-        loadBlogPosts();
-      }
-    };
+    // Register robust cross-tab & cross-component listener
+    const unregister = registerDataSyncListener('blog', loadBlogPosts);
 
-    window.addEventListener('espoir_data_updated', handleDataUpdate);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('espoir_data_updated', handleDataUpdate);
+      unregister();
     };
   }, []);
 

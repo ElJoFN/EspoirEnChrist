@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MinistryEvent, getStoredEvents, saveStoredEvents } from '../data/events';
 import { getSupabaseClient } from '../services/supabase';
-import { fetchServerEvents } from '../services/api';
+import { fetchServerEvents, registerDataSyncListener } from '../services/api';
 import { Calendar, Clock, MapPin, Video, Download, Check, User, ExternalLink } from 'lucide-react';
 
 export const EventsSection: React.FC = () => {
@@ -61,20 +61,15 @@ export const EventsSection: React.FC = () => {
 
     loadEvents();
 
-    // Poll server API every 6s for cross-device real-time sync
-    const interval = setInterval(loadEvents, 6000);
+    // Poll server API every 4s for instant cross-device real-time sync
+    const interval = setInterval(loadEvents, 4000);
 
-    // Listen for updates from Admin page
-    const handleDataUpdate = (e: any) => {
-      if (!e.detail || e.detail.type === 'events') {
-        loadEvents();
-      }
-    };
+    // Register robust cross-tab & cross-component listener
+    const unregister = registerDataSyncListener('events', loadEvents);
 
-    window.addEventListener('espoir_data_updated', handleDataUpdate);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('espoir_data_updated', handleDataUpdate);
+      unregister();
     };
   }, []);
 

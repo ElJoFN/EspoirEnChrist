@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PrayerItem, getStoredPrayers, saveStoredPrayers, getStoredPrayedIds, saveStoredPrayedIds } from '../data/prayers';
 import { getSupabaseClient } from '../services/supabase';
-import { fetchServerPrayers, saveServerPrayers } from '../services/api';
+import { fetchServerPrayers, saveServerPrayers, registerDataSyncListener } from '../services/api';
 import { HeartHandshake, PlusCircle, CheckCircle, Filter, AlertCircle, Heart, Send, Shield, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PRAYERS_PER_PAGE = 6;
@@ -22,7 +22,7 @@ export const PrayerWallSection: React.FC = () => {
   const [isUrgent, setIsUrgent] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState(false);
 
-  // Load prayers from Server API & Supabase for cross-device sync
+  // Load prayers from Server API & Supabase for robust cross-device sync
   useEffect(() => {
     const loadPrayers = async () => {
       // 1. Fetch from real-time full-stack server API
@@ -73,20 +73,15 @@ export const PrayerWallSection: React.FC = () => {
 
     loadPrayers();
 
-    // Poll server API every 6s for cross-device real-time sync
-    const interval = setInterval(loadPrayers, 6000);
+    // Poll server API every 4s for instant cross-device real-time sync
+    const interval = setInterval(loadPrayers, 4000);
 
-    // Listen for updates from Admin page
-    const handleDataUpdate = (e: any) => {
-      if (!e.detail || e.detail.type === 'prayers') {
-        loadPrayers();
-      }
-    };
+    // Register robust cross-tab & cross-component listener
+    const unregister = registerDataSyncListener('prayers', loadPrayers);
 
-    window.addEventListener('espoir_data_updated', handleDataUpdate);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('espoir_data_updated', handleDataUpdate);
+      unregister();
     };
   }, []);
 

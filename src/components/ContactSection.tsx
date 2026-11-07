@@ -3,7 +3,7 @@ import { Send, CheckCircle, HelpCircle, ChevronDown, Sparkles } from 'lucide-rea
 
 import { ContactMessage, getStoredContactMessages, saveStoredContactMessages } from '../data/contactMessages';
 import { getSupabaseClient } from '../services/supabase';
-import { saveServerMessages } from '../services/api';
+import { saveServerMessages, fetchServerMessages, registerDataSyncListener } from '../services/api';
 
 export const ContactSection: React.FC = () => {
   const [name, setName] = useState('');
@@ -16,6 +16,31 @@ export const ContactSection: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [savedMessages, setSavedMessages] = useState<ContactMessage[]>(() => getStoredContactMessages());
+
+  // Load and sync messages with server API
+  useEffect(() => {
+    const loadMsgs = async () => {
+      const serverMsgs = await fetchServerMessages();
+      if (Array.isArray(serverMsgs)) {
+        setSavedMessages((prev) => {
+          if (JSON.stringify(prev) !== JSON.stringify(serverMsgs)) {
+            saveStoredContactMessages(serverMsgs, false);
+            return serverMsgs;
+          }
+          return prev;
+        });
+      }
+    };
+
+    loadMsgs();
+    const interval = setInterval(loadMsgs, 4000);
+    const unregister = registerDataSyncListener('messages', loadMsgs);
+
+    return () => {
+      clearInterval(interval);
+      unregister();
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
